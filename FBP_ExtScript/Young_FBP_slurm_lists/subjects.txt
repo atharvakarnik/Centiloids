@@ -1,0 +1,13 @@
+/cbica/projects/DPPOS/Pipelines/Centiloids/Data/DICOMS_from_FBP/Young_FBP/101437
+/cbica/projects/DPPOS/Pipelines/Centiloids/Data/DICOMS_from_FBP/Young_FBP/119551
+/cbica/projects/DPPOS/Pipelines/Centiloids/Data/DICOMS_from_FBP/Young_FBP/198665
+/cbica/projects/DPPOS/Pipelines/Centiloids/Data/DICOMS_from_FBP/Young_FBP/296898
+/cbica/projects/DPPOS/Pipelines/Centiloids/Data/DICOMS_from_FBP/Young_FBP/315554
+/cbica/projects/DPPOS/Pipelines/Centiloids/Data/DICOMS_from_FBP/Young_FBP/363785
+/cbica/projects/DPPOS/Pipelines/Centiloids/Data/DICOMS_from_FBP/Young_FBP/395690
+/cbica/projects/DPPOS/Pipelines/Centiloids/Data/DICOMS_from_FBP/Young_FBP/404333
+/cbica/projects/DPPOS/Pipelines/Centiloids/Data/DICOMS_from_FBP/Young_FBP/406808
+/cbica/projects/DPPOS/Pipelines/Centiloids/Data/DICOMS_from_FBP/Young_FBP/411884
+/cbica/projects/DPPOS/Pipelines/Centiloids/Data/DICOMS_from_FBP/Young_FBP/453954
+/cbica/projects/DPPOS/Pipelines/Centiloids/Data/DICOMS_from_FBP/Young_FBP/462623
+/cbica/projects/DPPOS/Pipelines/Centiloids/Data/DICOMS_from_FBP/Young_FBP/487972

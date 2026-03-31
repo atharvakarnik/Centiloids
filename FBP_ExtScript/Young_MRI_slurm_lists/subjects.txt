@@ -1,0 +1,13 @@
+/cbica/projects/DPPOS/Pipelines/Centiloids/Data/DICOMS_from_FBP/Young_MRI/101437_mr
+/cbica/projects/DPPOS/Pipelines/Centiloids/Data/DICOMS_from_FBP/Young_MRI/119551_mr
+/cbica/projects/DPPOS/Pipelines/Centiloids/Data/DICOMS_from_FBP/Young_MRI/198665_mr
+/cbica/projects/DPPOS/Pipelines/Centiloids/Data/DICOMS_from_FBP/Young_MRI/296898_mr
+/cbica/projects/DPPOS/Pipelines/Centiloids/Data/DICOMS_from_FBP/Young_MRI/315554_mr
+/cbica/projects/DPPOS/Pipelines/Centiloids/Data/DICOMS_from_FBP/Young_MRI/363785_mr
+/cbica/projects/DPPOS/Pipelines/Centiloids/Data/DICOMS_from_FBP/Young_MRI/395690_mr
+/cbica/projects/DPPOS/Pipelines/Centiloids/Data/DICOMS_from_FBP/Young_MRI/404333_mr
+/cbica/projects/DPPOS/Pipelines/Centiloids/Data/DICOMS_from_FBP/Young_MRI/406808_mr
+/cbica/projects/DPPOS/Pipelines/Centiloids/Data/DICOMS_from_FBP/Young_MRI/411884_mr
+/cbica/projects/DPPOS/Pipelines/Centiloids/Data/DICOMS_from_FBP/Young_MRI/453954_mr
+/cbica/projects/DPPOS/Pipelines/Centiloids/Data/DICOMS_from_FBP/Young_MRI/462623_mr
+/cbica/projects/DPPOS/Pipelines/Centiloids/Data/DICOMS_from_FBP/Young_MRI/487972_mr

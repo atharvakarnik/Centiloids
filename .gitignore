@@ -1,0 +1,39 @@
+# Python cache
+__pycache__/
+*.pyc
+
+# Virtual envs
+venv/
+.venv/
+
+# Build/output
+build/
+dist/
+out/
+results/
+logs/
+
+# IDE/editor
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# HPC-specific scratch/temp
+tmp/
+scratch/
+*.out
+*.err
+*.log
+*.xlsx
+*.csv
+
+# Explicit Ignores
+Data/
+SynthStrip/
+Logs/
+Protocols/
+SPM_based/
+VisualizeIDs.sh
