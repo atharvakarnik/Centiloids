@@ -28,7 +28,7 @@ scratch/
 *.err
 *.log
 *.xlsx
-*.csv
+./*.csv
 
 # Explicit Ignores
 Data/
