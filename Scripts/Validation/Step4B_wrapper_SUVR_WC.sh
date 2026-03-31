@@ -22,6 +22,7 @@ S3_REG_CSV_FBP="${LIST_DIR_FBP}/s3_petmni_registration.csv"
 
 LIST_DIR_OUT="${PROJ_DIR}/Lists/2FB_Val_B_WC"
 PROTO_DIR_OUT="${PROJ_DIR}/Protocols/2FB_Val_B_WC"
+LOG_DIR="${PROJ_DIR}/Logs/2FB_Val_B_WC"
 
 ATLAS_DIR="${PROJ_DIR}/Data/Atlases"
 SCRIPTS_DIR="${PROJ_DIR}/Scripts/Validation"
@@ -36,7 +37,7 @@ VOI_WC="${ATLAS_DIR}/voi_WhlCbl_2mm.nii.gz"
 
 mkdir -p "${LIST_DIR_OUT}" "${PROTO_DIR_OUT}" \
   "${PROTO_DIR_OUT}/Centiloid_B_WC/per_subject" \
-  "${PROJ_DIR}/Logs/FB_Val_B_WC"
+  "${LOG_DIR}"
 
 need_file(){ [ -f "$1" ] || { echo "ERROR: missing $1"; exit 1; }; }
 need_file "${S3_REG_CSV_PIB}"
@@ -115,7 +116,7 @@ jobid=$(sbatch --parsable \
   --job-name=FB_SUVR_WC_B \
   --partition=all \
   --propagate=NONE \
-  --output="${PROJ_DIR}/Logs/2FB_Val_B_WC/S4B_SUVR_WC_%A_%a.log" \
+  --output="${LOG_DIR}/S4B_SUVR_WC_%A_%a.log" \
   --time=00:20:00 --mem=2G --cpus-per-task=1 \
   --export=PROJ_DIR="${PROJ_DIR}",PROTO_DIR="${PROTO_DIR_OUT}",LIST_DIR="${LIST_DIR_OUT}",SUBJECT_LIST="${SUBJECT_LIST}",VOI_CTX="${VOI_CTX}",VOI_WC="${VOI_WC}",FSLOUTPUTTYPE='NIFTI_GZ' \
   --array="${ARRAY_RANGE}" "${SCRIPTS_DIR}/Step4B_SUVR_WC.sh")
@@ -126,7 +127,7 @@ echo "Submitting finalize job (afterok:${jobid})"
 sbatch \
   --partition=all \
   --job-name=FB_S4B_finalize \
-  --output="${PROJ_DIR}/Logs/2FB_Val_B_WC/S4B_finalize_%j.log" \
+  --output="${LOG_DIR}/S4B_finalize_%j.log" \
   --dependency=afterok:"${jobid}" \
   --time=00:05:00 --mem=2G --cpus-per-task=1 \
   --export=PROTO_DIR="${PROTO_DIR_OUT}",LIST_DIR="${LIST_DIR_OUT}",STATUS_CSV="${STATUS_CSV}" \
