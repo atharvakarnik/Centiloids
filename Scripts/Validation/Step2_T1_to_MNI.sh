@@ -140,11 +140,23 @@ fi
 if [ "${T1_MNI_MODE}" = "Syn" ]; then
     echo "  -> Using antsRegistrationSyN.sh (baseline)"
     echo "     Threads: ${threads}, Mask used: ${mask_used}"
+    INIT_MAT="${out_dir}/${subLong}_T1_rMNI_init.mat"
+
+    antsAI \
+        -d 3 \
+        -m MI["${MNI_TEMPLATE}","${t1}",32,Regular,0.25] \
+        -t Rigid[0.1] \
+        -s [1,0.015] \
+        -g [40,0x40x40] \
+        -c [10,1e-6,10] \
+        -o "${INIT_MAT}" \
+        -v 1
 
     antsRegistrationSyN.sh \
         -d 3 \
         -f "${MNI_TEMPLATE}" \
         -m "${t1}" \
+        -i "${INIT_MAT}" \
         -o "${out_prefix}" \
         -n "${threads}"
         # "${args_mask[@]}"  # enable if you want to constrain with mask

@@ -155,16 +155,22 @@ fi
 #     exit 1
 # fi
 
-echo "  -> Running ANTs rigid (PET -> T1)..."
+echo "  -> Running ANTs rigid+affine (PET -> T1)..."
 
 prefix="${out_dir}/${subLong}_PET2T1_"
 
 antsRegistration -d 3 \
   -o ["${prefix}","${prefix}Warped.nii.gz"] \
   --float 1 \
+  --winsorize-image-intensities [0.005,0.995] \
   --use-histogram-matching 0 \
   -r ["${t1}","${pet_in}",1] \
   -t Rigid[0.1] \
+  -m MI["${t1}","${pet_in}",1,32,Regular,0.25] \
+  -c [1000x500x250x100,1e-6,10] \
+  -s 3x2x1x0vox \
+  -f 8x4x2x1 \
+  -t Affine[0.1] \
   -m MI["${t1}","${pet_in}",1,32,Regular,0.25] \
   -c [1000x500x250x100,1e-6,10] \
   -s 3x2x1x0vox \
@@ -176,6 +182,7 @@ mv -f "${prefix}Warped.nii.gz" "${out_pet_rT1}"
 # mv -f "${prefix}0GenericAffine.mat" "${out_mat}"
 
 # Optional: keep directory clean
+rm -f "${prefix}"0GenericAffine.mat 2>/dev/null || true
 rm -f "${prefix}"InverseWarped.nii.gz 2>/dev/null || true
 
 echo "${site},${sub},${subLong},${pet_og},${t1},OK;${pet_note}" >> "${SELECTION_CSV}"
