@@ -37,7 +37,86 @@ OUT_DIR="${PROTO_DIR}/Centiloid_Scores_WC"
 PER_SUB_DIR="${OUT_DIR}/per_subject"
 mkdir -p "${PER_SUB_DIR}"
 
+############################################
+# Make sure FSL/fslstats exists (robust)
+############################################
+
 need_cmd() { command -v "$1" >/dev/null 2>&1 || { echo "ERROR: missing command: $1"; exit 1; }; }
+
+ensure_fsl() {
+  # if need_cmd fslstats; then
+  #   return 0
+  # fi
+
+  # If FSLDIR is set, try PATH update + source config
+  if [ -n "${FSLDIR:-}" ]; then
+    export PATH="${FSLDIR}/bin:${PATH}"
+    # shellcheck disable=SC1090
+    if [ -f "${FSLDIR}/etc/fslconf/fsl.sh" ]; then
+      # shellcheck disable=SC1090
+      source "${FSLDIR}/etc/fslconf/fsl.sh" >/dev/null 2>&1 || true
+    fi
+  fi
+  if need_cmd fslstats; then
+    return 0
+  fi
+
+  # Try modules if available (or initialize them if missing)
+  if ! command -v module >/dev/null 2>&1; then
+    if [ -f /usr/share/Modules/init/bash ]; then
+      # shellcheck disable=SC1091
+      source /usr/share/Modules/init/bash >/dev/null 2>&1 || true
+    fi
+  fi
+
+  if command -v module >/dev/null 2>&1; then
+    module load fsl/5.0.11 >/dev/null 2>&1 || true
+  fi
+
+  # If module load set FSLDIR, source config and update PATH
+  if [ -n "${FSLDIR:-}" ]; then
+    export PATH="${FSLDIR}/bin:${PATH}"
+    # shellcheck disable=SC1090
+    if [ -f "${FSLDIR}/etc/fslconf/fsl.sh" ]; then
+      # shellcheck disable=SC1090
+      source "${FSLDIR}/etc/fslconf/fsl.sh" >/dev/null 2>&1 || true
+    fi
+  fi
+
+  # Really annoying to still not have fslstats, so this is hardest fallback
+  if need_cmd fslstats; then
+      return 0
+  else
+      # Fallback to direct binary path
+      FSLSTATS_BIN="/cbica/software/external/fsl/centos7/5.0.11/bin/fslstats"
+
+      if [ -x "$FSLSTATS_BIN" ]; then
+          fslstats() {
+              "$FSLSTATS_BIN" "$@"
+          }
+      else
+          echo "Error: fslstats not found and fallback binary is not executable." >&2
+          return 1
+      fi
+  fi
+}
+
+if ! ensure_fsl; then
+  log "ERROR: fslstats not available after attempts. FSLDIR='${FSLDIR:-}' PATH='${PATH}'"
+  write_fail_csv "missing_fslstats"
+  exit 0
+fi
+
+if ! need_cmd python; then
+  log "ERROR: python not available in PATH='${PATH}'"
+  write_fail_csv "missing_python"
+  exit 0
+fi
+
+export FSLOUTPUTTYPE='NIFTI_GZ'
+
+# -------------------------------------------------------
+
 need_cmd fslstats
 need_cmd python
 
