@@ -24,7 +24,7 @@
 
 #SBATCH --propagate=NONE
 #SBATCH --job-name=PET_Preproc
-#SBATCH --output=Logs/2Validation/PET_Preproc_%A_%a.log
+#SBATCH --output=Logs/3Validation/PET_Preproc_%A_%a.log
 #SBATCH --time=00:10:00
 #SBATCH --cpus-per-task=1
 #SBATCH --mem=4G

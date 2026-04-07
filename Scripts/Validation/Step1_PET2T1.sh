@@ -20,10 +20,10 @@
 #   bash Step1_wrapper_PET2T1.sh
 #
 #SBATCH --job-name=PET2T1
-#SBATCH --output=Logs/2Validation/PET2T1_%A_%a.log
-#SBATCH --time=3:00:00
-#SBATCH --cpus-per-task=4
-#SBATCH --mem=16G
+#SBATCH --output=Logs/3FB_Val_PiB/PET2T1_%A_%a.log
+#SBATCH --time=01:20:00
+#SBATCH --cpus-per-task=6
+#SBATCH --mem=8G
 
 set -euo pipefail
 
@@ -37,11 +37,52 @@ set -euo pipefail
 
 export OMP_NUM_THREADS="${SLURM_CPUS_PER_TASK:-1}"
 export ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS="${SLURM_CPUS_PER_TASK:-1}"
+unset OMP_THREAD_LIMIT
 export OMP_PROC_BIND=true
 export OMP_PLACES=cores
 
+# ------- CPU Time limit exceeded - debugging -------
+# Show inherited CPU-time limit for debugging
+echo "ulimit -St before: $(ulimit -St)"
+echo "ulimit -Ht before: $(ulimit -Ht)"
+
+# Try to remove inherited CPU-time cap
+ulimit -St unlimited 2>/dev/null || true
+ulimit -Ht unlimited 2>/dev/null || true
+
+# Show effective limit after reset
+echo "ulimit -St after : $(ulimit -St)"
+echo "ulimit -Ht after : $(ulimit -Ht)"
+# ---------------------------------------------------
+
 REG_ROOT="${PROTO_DIR}/Registration_PET_to_T1"
 mkdir -p "${REG_ROOT}" "${LIST_DIR}"
+
+# ------- I can't tolerate ANTs not visible to 10% nodes in the same parition! -------
+# --- Minimal ANTs initialization ---
+ANTS_BIN_DIR="/cbica/software/external/ANTs/centos7/2.3.1/bin"
+ANTS_REQUIRED_CMD="antsRegistration"
+
+# Only initialize ANTs if it is not already visible
+if ! command -v "${ANTS_REQUIRED_CMD}" >/dev/null 2>&1; then
+    if [ -x "${ANTS_ROOT}/bin/${ANTS_REQUIRED_CMD}" ]; then
+        export ANTSPATH="${ANTS_ROOT}/bin/"
+        export PATH="${ANTS_ROOT}/bin:${PATH}"
+        export LD_LIBRARY_PATH="${ANTS_ROOT}/lib:${ANTS_ROOT}/ITKv5-install/lib:${LD_LIBRARY_PATH:-}"
+        hash -r
+    else
+        echo "ERROR: ANTs not available. Expected executable not found at:" >&2
+        echo "  ${ANTS_ROOT}/bin/${ANTS_REQUIRED_CMD}" >&2
+        exit 127
+    fi
+fi
+
+# Final sanity check
+if ! command -v "${ANTS_REQUIRED_CMD}" >/dev/null 2>&1; then
+    echo "ERROR: Failed to initialize ANTs; '${ANTS_REQUIRED_CMD}' is still not in PATH." >&2
+    exit 127
+fi
+# --------------------------------------------------------------------------------------
 
 # Stage-1 registration logs
 SELECTION_CSV="${LIST_DIR}/s1_pet2t1_registration.csv"

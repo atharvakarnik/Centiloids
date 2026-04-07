@@ -18,10 +18,10 @@ PET_TAG="PET_PiB"
 
 PROJ_DIR="${HOME}/Pipelines/Centiloids"
 
-LIST_DIR="${PROJ_DIR}/Lists/2Validation"
-PROTO_DIR="${PROJ_DIR}/Protocols/2Validation"
+LIST_DIR="${PROJ_DIR}/Lists/3FB_Val_PiB"
+PROTO_DIR="${PROJ_DIR}/Protocols/3FB_Val_PiB"
 PREPROC_PET_ROOT="${PROTO_DIR}/PET_Preproc"
-REORIENT_DIR="${PROJ_DIR}/Data/Validation/ReOrientedLPS"
+REORIENT_DIR="${PROJ_DIR}/Data/Validation_FBP/ReOrientedLPS"
 SCRIPTS_DIR="${PROJ_DIR}/Scripts/Validation"
 
 mkdir -p "${LIST_DIR}" "${PROTO_DIR}"
@@ -111,6 +111,10 @@ for site_dir in "${PREPROC_PET_ROOT}"/*; do
         echo "${site},${sub},${subLong},${note}" >> "${SELECTION_CSV}"
     done
 done
+
+# TEMP for 2 subs that exceeded CPU limit
+# SUBJECT_LIST="${LIST_DIR}/s1_pet2t1_subjects_2CPUXceeds.csv"
+# TEMP ends here. Clear the above if I don't, please :)
 
 n=$(wc -l < "${SUBJECT_LIST}")
 

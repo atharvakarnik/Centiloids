@@ -3,10 +3,10 @@
 #SBATCH --job-name=PET_OrientGate
 #SBATCH --partition=all
 #SBATCH --propagate=NONE
-#SBATCH --output=Logs/2Validation/PET_OrientGate_%A_%a.log
-#SBATCH --time=00:20:00
-#SBATCH --cpus-per-task=4
-#SBATCH --mem=4G
+#SBATCH --output=Logs/3Validation/PET_OrientGate_%A_%a.log
+#SBATCH --time=00:25:00
+#SBATCH --cpus-per-task=6
+#SBATCH --mem=3G
 
 set -euo pipefail
 
@@ -32,6 +32,78 @@ fi
 idx="${SLURM_ARRAY_TASK_ID}"
 line=$(sed -n "$((idx + 1))p" "${SUBJECT_LIST}" || true)
 [ -n "${line}" ] || exit 0
+
+############################################
+# Make sure FSL/fslstats exists (robust)
+############################################
+
+need_cmd() { command -v "$1" >/dev/null 2>&1 || { echo "ERROR: missing command: $1"; exit 1; }; }
+
+ensure_fsl() {
+  # if need_cmd fslstats; then
+  #   return 0
+  # fi
+
+  # If FSLDIR is set, try PATH update + source config
+  if [ -n "${FSLDIR:-}" ]; then
+    export PATH="${FSLDIR}/bin:${PATH}"
+    # shellcheck disable=SC1090
+    if [ -f "${FSLDIR}/etc/fslconf/fsl.sh" ]; then
+      # shellcheck disable=SC1090
+      source "${FSLDIR}/etc/fslconf/fsl.sh" >/dev/null 2>&1 || true
+    fi
+  fi
+  if need_cmd fslstats; then
+    return 0
+  fi
+
+  # Try modules if available (or initialize them if missing)
+  if ! command -v module >/dev/null 2>&1; then
+    if [ -f /usr/share/Modules/init/bash ]; then
+      # shellcheck disable=SC1091
+      source /usr/share/Modules/init/bash >/dev/null 2>&1 || true
+    fi
+  fi
+
+  if command -v module >/dev/null 2>&1; then
+    module load fsl/5.0.11 >/dev/null 2>&1 || true
+  fi
+
+  # If module load set FSLDIR, source config and update PATH
+  if [ -n "${FSLDIR:-}" ]; then
+    export PATH="${FSLDIR}/bin:${PATH}"
+    # shellcheck disable=SC1090
+    if [ -f "${FSLDIR}/etc/fslconf/fsl.sh" ]; then
+      # shellcheck disable=SC1090
+      source "${FSLDIR}/etc/fslconf/fsl.sh" >/dev/null 2>&1 || true
+    fi
+  fi
+
+  # Really annoying to still not have fslstats, so this is hardest fallback
+  if need_cmd fslstats; then
+      return 0
+  else
+      # Fallback to direct binary path
+      FSLSTATS_BIN="/cbica/software/external/fsl/centos7/5.0.11/bin/fslstats"
+
+      if [ -x "$FSLSTATS_BIN" ]; then
+          fslstats() {
+              "$FSLSTATS_BIN" "$@"
+          }
+      else
+          echo "Error: fslstats not found and fallback binary is not executable." >&2
+          return 1
+      fi
+  fi
+}
+
+if ! ensure_fsl; then
+  log "ERROR: fslstats not available after attempts. FSLDIR='${FSLDIR:-}' PATH='${PATH}'"
+  write_fail_csv "missing_fslstats"
+  exit 0
+fi
+
+export FSLOUTPUTTYPE='NIFTI_GZ'
 
 site=$(echo "${line}" | awk '{print $1}')
 sub=$(echo  "${line}" | awk '{print $2}')

@@ -86,7 +86,7 @@ ensure_fsl() {
     return 0
   fi
 
-  # If FSLDIR is set, try PATH update + source config
+  # If FSLDIR is already set, try PATH update + source config
   if [ -n "${FSLDIR:-}" ]; then
     export PATH="${FSLDIR}/bin:${PATH}"
     # shellcheck disable=SC1090
@@ -94,9 +94,10 @@ ensure_fsl() {
       # shellcheck disable=SC1090
       source "${FSLDIR}/etc/fslconf/fsl.sh" >/dev/null 2>&1 || true
     fi
-  fi
-  if need_cmd fslstats; then
-    return 0
+
+    if need_cmd fslstats; then
+      return 0
+    fi
   fi
 
   # Try modules if available (or initialize them if missing)
@@ -109,10 +110,25 @@ ensure_fsl() {
 
   if command -v module >/dev/null 2>&1; then
     module load fsl/5.0.11 >/dev/null 2>&1 || true
+
+    # If module load set FSLDIR, try PATH update + source config
+    if [ -n "${FSLDIR:-}" ]; then
+      export PATH="${FSLDIR}/bin:${PATH}"
+      # shellcheck disable=SC1090
+      if [ -f "${FSLDIR}/etc/fslconf/fsl.sh" ]; then
+        # shellcheck disable=SC1090
+        source "${FSLDIR}/etc/fslconf/fsl.sh" >/dev/null 2>&1 || true
+      fi
+    fi
+
+    if need_cmd fslstats; then
+      return 0
+    fi
   fi
 
-  # If module load set FSLDIR, source config and update PATH
-  if [ -n "${FSLDIR:-}" ]; then
+  # Last resort: known cluster install
+  if [ -x /cbica/software/external/fsl/centos7/5.0.11/bin/fslstats ]; then
+    export FSLDIR=/cbica/software/external/fsl/centos7/5.0.11
     export PATH="${FSLDIR}/bin:${PATH}"
     # shellcheck disable=SC1090
     if [ -f "${FSLDIR}/etc/fslconf/fsl.sh" ]; then

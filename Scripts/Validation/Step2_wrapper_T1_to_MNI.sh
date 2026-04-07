@@ -14,8 +14,8 @@ set -euo pipefail
 
 PROJ_DIR="${HOME}/Pipelines/Centiloids"
 
-LIST_DIR="${PROJ_DIR}/Lists/2FB_Val_FBP"
-PROTO_DIR="${PROJ_DIR}/Protocols/2FB_Val_FBP"
+LIST_DIR="${PROJ_DIR}/Lists/3FB_Val_FBP"
+PROTO_DIR="${PROJ_DIR}/Protocols/3FB_Val_FBP"
 REORIENT_DIR="${PROJ_DIR}/Data/Validation_FBP/ReOrientedLPS"
 DLICV_DIR="${PROJ_DIR}/Data/DLICV"      # No mask used for validation datatset, though it's safe to keep as-is here
 ATLAS_DIR="${PROJ_DIR}/Data/Atlases"
@@ -25,7 +25,7 @@ mkdir -p "${LIST_DIR}" "${PROTO_DIR}"
 
 # MNI Template
 # MNI_TEMPLATE="${ATLAS_DIR}/MNI152_T1_1mm.nii.gz"      # Good choice overall, but have to use SPM-provided for GAAIN-validation
-MNI_TEMPLATE="${ATLAS_DIR}/avg152T1.nii.gz"
+MNI_TEMPLATE="${ATLAS_DIR}/MNI152_T1_2mm.nii.gz"        # Replaced avg152T1 for Git Issue #1
 
 
 # ----------------------------
@@ -35,8 +35,8 @@ MNI_TEMPLATE="${ATLAS_DIR}/avg152T1.nii.gz"
 #   SPMlike : SPM-unified-like workflow using tissue priors (FSL priors) via Atropos + multi-channel ANTs reg
 #
 # Manually set before running Step2:
-# T1_MNI_MODE="Syn"
-T1_MNI_MODE="SPMlike"
+T1_MNI_MODE="Syn"
+# T1_MNI_MODE="SPMlike"
 
 # Stage-1 mapping list
 S1_SELECTION="${LIST_DIR}/s1_pet2t1_selection_T1.csv"

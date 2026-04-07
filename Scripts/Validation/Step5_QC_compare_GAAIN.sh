@@ -13,8 +13,8 @@
 set -euo pipefail
 
 PROJ_DIR="${PROJ_DIR:-${HOME}/Pipelines/Centiloids}"
-LIST_DIR="${LIST_DIR:-${PROJ_DIR}/Lists/2Validation}"
-PROTO_DIR="${PROTO_DIR:-${PROJ_DIR}/Protocols/2Validation}"
+LIST_DIR="${LIST_DIR:-${PROJ_DIR}/Lists/3Validation}"
+PROTO_DIR="${PROTO_DIR:-${PROJ_DIR}/Protocols/3Validation}"
 
 OURS_CSV="${OURS_CSV:-${LIST_DIR}/s4_suvrcl_status.csv}"
 REF_CSV="${REF_CSV:-${LIST_DIR}/GAAIN/gaain_reference_scores.csv}"

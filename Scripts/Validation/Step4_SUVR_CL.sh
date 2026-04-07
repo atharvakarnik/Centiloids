@@ -11,7 +11,7 @@
 #SBATCH --job-name=Centiloid_SUVR
 #SBATCH --partition=all
 #SBATCH --propagate=NONE
-#SBATCH --output=Logs/2Validation/SUVR_CL_%A_%a.log
+#SBATCH --output=Logs/3Validation/SUVR_CL_%A_%a.log
 #SBATCH --time=00:12:00
 #SBATCH --cpus-per-task=1
 #SBATCH --mem=2G

@@ -14,7 +14,7 @@
 #SBATCH --partition=all
 #SBATCH --propagate=NONE
 #SBATCH --job-name=PET_MNI
-#SBATCH --output=Logs/2FB_Val_PiB/PET_MNI_%A_%a.log
+#SBATCH --output=Logs/3FB_Val_FBP/PET_MNI_%A_%a.log
 #SBATCH --time=00:45:00
 #SBATCH --cpus-per-task=2
 #SBATCH --mem-per-cpu=2G

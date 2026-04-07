@@ -26,7 +26,7 @@
 #SBATCH --propagate=NONE
 #SBATCH --partition=all
 #SBATCH --job-name=T1_MNI
-#SBATCH --output=Logs/2FB_Val_FBP/T1_MNI_%A_%a.log
+#SBATCH --output=Logs/3FB_Val_FBP/T1_MNI_%A_%a.log
 #SBATCH --time=6:30:00
 #SBATCH --cpus-per-task=8
 #SBATCH --mem-per-cpu=6G
@@ -50,6 +50,31 @@ export OMP_NUM_THREADS="${threads}"
 
 REG_ROOT="${PROTO_DIR}/Registration_T1_to_MNI"
 mkdir -p "${REG_ROOT}" "${LIST_DIR}"
+
+# ------- I can't tolerate ANTs not visible to 10% nodes in the same parition! -------
+# --- Minimal ANTs initialization ---
+ANTS_BIN_DIR="/cbica/software/external/ANTs/centos7/2.3.1/bin"
+ANTS_REQUIRED_CMD="antsRegistration"
+
+# Only initialize ANTs if it is not already visible
+if ! command -v "${ANTS_REQUIRED_CMD}" >/dev/null 2>&1; then
+    if [ -x "${ANTS_BIN_DIR}/${ANTS_REQUIRED_CMD}" ]; then
+        export ANTSPATH="${ANTS_BIN_DIR}/"
+        export PATH="${ANTS_BIN_DIR}:${PATH}"
+        hash -r
+    else
+        echo "ERROR: ANTs not available. Expected executable not found at:" >&2
+        echo "  ${ANTS_BIN_DIR}/${ANTS_REQUIRED_CMD}" >&2
+        exit 127
+    fi
+fi
+
+# Final sanity check
+if ! command -v "${ANTS_REQUIRED_CMD}" >/dev/null 2>&1; then
+    echo "ERROR: Failed to initialize ANTs; '${ANTS_REQUIRED_CMD}' is still not in PATH." >&2
+    exit 127
+fi
+# --------------------------------------------------------------------------------------
 
 # Stage-2 logs
 REG_CSV="${LIST_DIR}/s2_t1mni_registration.csv"
@@ -280,13 +305,21 @@ else
     exit 1
 fi
 
-required_files=(
-  "${out_prefix}0GenericAffine.mat"
-  "${out_prefix}1Warp.nii.gz"
-  "${out_prefix}1InverseWarp.nii.gz"
-  "${out_prefix}Warped.nii.gz"
-  "${out_prefix}InverseWarped.nii.gz"
-)
+if [ "${T1_MNI_MODE}" = "Syn" ]; then
+  required_files=(
+    "${out_prefix}0GenericAffine.mat"
+    "${out_prefix}1Warp.nii.gz"
+    "${out_prefix}1InverseWarp.nii.gz"
+  )
+else
+  required_files=(
+    "${out_prefix}0GenericAffine.mat"
+    "${out_prefix}1Warp.nii.gz"
+    "${out_prefix}1InverseWarp.nii.gz"
+    "${out_prefix}Warped.nii.gz"
+    "${out_prefix}InverseWarped.nii.gz"
+  )
+fi
 
 missing=0
 for f in "${required_files[@]}"; do
