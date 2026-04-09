@@ -209,17 +209,30 @@ elif [ "${T1_MNI_MODE}" = "SPMlike" ]; then
     echo "    [1/5] N4 bias correction..."
     N4BiasFieldCorrection -d 3 -i "${t1}" -o "${t1_n4}" -v 1
 
+    init_ai="${work}/${subLong}_init_ai.mat"
+    echo "    [2/6] antsAI rigid initialization..."
+    antsAI \
+      -d 3 \
+      -m MI["${MNI_TEMPLATE}","${t1_n4}",32,Regular,0.25] \
+      -t Rigid[0.1] \
+      -s [1,0.015] \
+      -g [40,0x40x40] \
+      -c [10,1e-6,10] \
+      -o "${init_ai}" \
+      -v 1
+
     # Initial low-DOF alignment to pull priors into subject space reliably
     init_prefix="${work}/${subLong}_init_"
-    echo "    [2/5] Initial Rigid+Affine (for prior warping)..."
+    echo "    [3/6] Initial Rigid+Affine (for prior warping)..."
     antsRegistration \
       -d 3 \
       --float 1 \
       --verbose 0 \
       --winsorize-image-intensities [0.005,0.995] \
       --use-histogram-matching 0 \
+      --initial-moving-transform "${init_ai}" \
       -o ["${init_prefix}","${init_prefix}Warped.nii.gz","${init_prefix}InverseWarped.nii.gz"] \
-      -r ["${MNI_TEMPLATE}","${t1_n4}",1] \
+      -r ["${MNI_TEMPLATE}","${t1_n4}",0] \
       -t Rigid[0.1] \
       -m MI["${MNI_TEMPLATE}","${t1_n4}",1,32,Regular,0.25] \
       -c [1000x500x250x100,1e-6,10] \
@@ -239,7 +252,7 @@ elif [ "${T1_MNI_MODE}" = "SPMlike" ]; then
     # Warp priors (template space) into subject space using inverse affine
     # Create Atropos prior set as %02d in subject space (01=GM, 02=WM, 03=CSF)
     prior_subj_pat="${work}/${subLong}_prior_subj_%02d.nii.gz"
-    echo "    [3/5] Warping priors to subject space..."
+    echo "    [4/6] Warping priors to subject space..."
     antsApplyTransforms -d 3 -r "${t1_n4}" -i "${prior_gm}"  -o "$(printf "${prior_subj_pat}" 1)" -n Linear -t ["${init_aff}",1]
     antsApplyTransforms -d 3 -r "${t1_n4}" -i "${prior_wm}"  -o "$(printf "${prior_subj_pat}" 2)" -n Linear -t ["${init_aff}",1]
     antsApplyTransforms -d 3 -r "${t1_n4}" -i "${prior_csf}" -o "$(printf "${prior_subj_pat}" 3)" -n Linear -t ["${init_aff}",1]
@@ -247,7 +260,7 @@ elif [ "${T1_MNI_MODE}" = "SPMlike" ]; then
     # Atropos segmentation with priors -> subject tissue posteriors
     post_pat="${work}/${subLong}_post_%02d.nii.gz"
     seg="${work}/${subLong}_seg.nii.gz"
-    echo "    [4/5] Atropos segmentation (GM/WM/CSF posteriors)..."
+    echo "    [5/6] Atropos segmentation (GM/WM/CSF posteriors)..."
 
     # Build a binary mask from the warped priors (operate only where priors indicate brain)
     prior1="$(printf "${prior_subj_pat}" 1)"
@@ -274,7 +287,7 @@ elif [ "${T1_MNI_MODE}" = "SPMlike" ]; then
 
     # Now do multi-channel registration: T1 + (GM/WM/CSF) channels
     # fixed: template T1, template priors; moving: subject T1, subject posteriors
-    echo "    [5/5] Multi-channel registration (T1 + tissue channels)..."
+    echo "    [6/6] Multi-channel registration (T1 + tissue channels)..."
     antsRegistration \
       -d 3 \
       --float 1 \
