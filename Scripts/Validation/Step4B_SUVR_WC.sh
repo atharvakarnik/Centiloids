@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Step4B_SUVR_WC.sh  (DROP-IN REPLACEMENT)
+# Step4B_SUVR_WC.sh
 #
 #SBATCH --job-name=FB_SUVR_WC_B
 #SBATCH --partition=all
@@ -100,11 +100,11 @@ ensure_fsl() {
     fi
   fi
 
-  # Try modules if available (or initialize them if missing)
+  # Even `module` command can be missing :( - some issue with env vars
   if ! command -v module >/dev/null 2>&1; then
-    if [ -f /usr/share/Modules/init/bash ]; then
+    if [ -f $CUBICLOCAL/lmod/lmod/init/bash ]; then
       # shellcheck disable=SC1091
-      source /usr/share/Modules/init/bash >/dev/null 2>&1 || true
+      source $CUBICLOCAL/lmod/lmod/init/bash >/dev/null 2>&1 || true
     fi
   fi
 

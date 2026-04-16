@@ -19,8 +19,10 @@
 # Submit via wrapper:
 #   bash Step1_wrapper_PET2T1.sh
 #
+#SBATCH --partition=all
+#SBATCH --propagate=NONE
 #SBATCH --job-name=PET2T1
-#SBATCH --output=Logs/3FB_Val_PiB/PET2T1_%A_%a.log
+#SBATCH --output=Logs/4FB_Val_FBP/PET2T1_%A_%a.log
 #SBATCH --time=01:20:00
 #SBATCH --cpus-per-task=6
 #SBATCH --mem=8G
@@ -34,6 +36,19 @@ set -euo pipefail
 : "${SUBJECT_LIST:?SUBJECT_LIST is not set}"
 : "${S0B_CSV:?S0B_CSV is not set}"
 : "${PET_TAG:?PET_TAG is not set}"
+
+# For some reason... module command is not visible...
+if ! command -v module >/dev/null 2>&1; then
+    if [ -f $CUBICLOCAL/lmod/lmod/init/bash ]; then
+      # shellcheck disable=SC1091
+      source $CUBICLOCAL/lmod/lmod/init/bash >/dev/null 2>&1 || true
+    fi
+fi
+
+if command -v module >/dev/null 2>&1; then
+    module use /cbica/share/modules || true
+    module load ants/2.3.1 || true
+fi
 
 export OMP_NUM_THREADS="${SLURM_CPUS_PER_TASK:-1}"
 export ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS="${SLURM_CPUS_PER_TASK:-1}"
@@ -58,9 +73,9 @@ echo "ulimit -Ht after : $(ulimit -Ht)"
 REG_ROOT="${PROTO_DIR}/Registration_PET_to_T1"
 mkdir -p "${REG_ROOT}" "${LIST_DIR}"
 
-# ------- I can't tolerate ANTs not visible to 10% nodes in the same parition! -------
-# --- Minimal ANTs initialization ---
-ANTS_BIN_DIR="/cbica/software/external/ANTs/centos7/2.3.1/bin"
+# ------- For some reason... ANTs not visible to 10% nodes in the same parition! -------
+# --- ANTs initialization ---
+ANTS_ROOT="/cbica/software/external/ANTs/centos7/2.3.1"
 ANTS_REQUIRED_CMD="antsRegistration"
 
 # Only initialize ANTs if it is not already visible
@@ -76,6 +91,14 @@ if ! command -v "${ANTS_REQUIRED_CMD}" >/dev/null 2>&1; then
         exit 127
     fi
 fi
+
+# echo "-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-"
+# echo "HOSTNAME: $(hostname)"
+# echo "KERNEL  : $(uname -r)"
+# echo "OS info : $(cat /etc/os-release 2>/dev/null || true)"
+# echo "which antsRegistration: $(command -v antsRegistration || echo not_found)"
+# echo "OSrelease env: ${OSrelease:-unset}"
+# echo "-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-"
 
 # Final sanity check
 if ! command -v "${ANTS_REQUIRED_CMD}" >/dev/null 2>&1; then

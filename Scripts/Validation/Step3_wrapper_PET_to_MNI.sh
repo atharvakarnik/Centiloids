@@ -16,8 +16,8 @@ set -euo pipefail
 
 PROJ_DIR="${HOME}/Pipelines/Centiloids"
 
-LIST_DIR="${PROJ_DIR}/Lists/3FB_Val_FBP"
-PROTO_DIR="${PROJ_DIR}/Protocols/3FB_Val_FBP"
+LIST_DIR="${PROJ_DIR}/Lists/4FB_Val_FBP"
+PROTO_DIR="${PROJ_DIR}/Protocols/4FB_Val_FBP"
 REG_PET_T1_DIR="${PROTO_DIR}/Registration_PET_to_T1"
 REG_T1_MNI_DIR="${PROTO_DIR}/Registration_T1_to_MNI"
 ATLAS_DIR="${PROJ_DIR}/Data/Atlases"

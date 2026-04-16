@@ -26,12 +26,12 @@ set -euo pipefail
 
 : "${PROJ_DIR:=${HOME}/Pipelines/Centiloids}"
 
-LIST_DIR="${PROJ_DIR}/Lists/3FB_Val_B_WC"
-PROTO_DIR="${PROJ_DIR}/Protocols/3FB_Val_B_WC"
+LIST_DIR="${PROJ_DIR}/Lists/4FB_Val_B_WC"
+PROTO_DIR="${PROJ_DIR}/Protocols/4FB_Val_B_WC"
 
-REF_CSV="${PROJ_DIR}/Lists/3FB_Val_PiB/GAAIN/FBP_Centiloids_ref.csv"
+REF_CSV="${PROJ_DIR}/Lists/4FB_Val_PiB/GAAIN/FBP_Centiloids_ref.csv"
 S4_STATUS="${LIST_DIR}/s4B_suvr_status.csv"
-AB_CSV="${PROJ_DIR}/Lists/3Validation/Tracer/centiloid_anchor_params_validation.csv"
+AB_CSV="${PROJ_DIR}/Lists/4Validation/Tracer/centiloid_anchor_params_validation.csv"
 
 OUT_DIR="${PROTO_DIR}/Centiloid_B_WC"
 mkdir -p "${OUT_DIR}"

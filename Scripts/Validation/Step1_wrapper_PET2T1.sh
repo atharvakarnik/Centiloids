@@ -13,13 +13,13 @@
 set -euo pipefail
 
 # IMPORTANT : Check this var meticulously to state correct cohort!!! 
-PET_TAG="PET_PiB"
+PET_TAG="PET_FBP"
 # ---------------------------------------------------------------- #
 
 PROJ_DIR="${HOME}/Pipelines/Centiloids"
 
-LIST_DIR="${PROJ_DIR}/Lists/3FB_Val_PiB"
-PROTO_DIR="${PROJ_DIR}/Protocols/3FB_Val_PiB"
+LIST_DIR="${PROJ_DIR}/Lists/4FB_Val_FBP"
+PROTO_DIR="${PROJ_DIR}/Protocols/4FB_Val_FBP"
 PREPROC_PET_ROOT="${PROTO_DIR}/PET_Preproc"
 REORIENT_DIR="${PROJ_DIR}/Data/Validation_FBP/ReOrientedLPS"
 SCRIPTS_DIR="${PROJ_DIR}/Scripts/Validation"
@@ -133,7 +133,7 @@ ARRAY_RANGE="0-$((n - 1))"
 echo "Submitting SLURM array job for ${ARRAY_RANGE}..."
 
 sbatch \
-    --export=PROJ_DIR="${PROJ_DIR}",PROTO_DIR="${PROTO_DIR}",REORIENT_DIR="${REORIENT_DIR}",LIST_DIR="${LIST_DIR}",SUBJECT_LIST="${SUBJECT_LIST}",S0B_CSV="${S0B_CSV}",PET_TAG="${PET_TAG}",FSLOUTPUTTYPE='NIFTI_GZ' \
+    --export=PROJ_DIR="${PROJ_DIR}",PROTO_DIR="${PROTO_DIR}",REORIENT_DIR="${REORIENT_DIR}",LIST_DIR="${LIST_DIR}",SUBJECT_LIST="${SUBJECT_LIST}",S0B_CSV="${S0B_CSV}",PET_TAG="${PET_TAG}",PATH="${PATH}",FSLOUTPUTTYPE='NIFTI_GZ' \
     --array="${ARRAY_RANGE}" "${SCRIPTS_DIR}/Step1_PET2T1.sh"
 
 echo "Submitted!"

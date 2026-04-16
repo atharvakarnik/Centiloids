@@ -14,15 +14,15 @@ set -euo pipefail
 ############################################
 PROJ_DIR="${HOME}/Pipelines/Centiloids"
 
-LIST_DIR_PIB="${PROJ_DIR}/Lists/3FB_Val_PiB"
+LIST_DIR_PIB="${PROJ_DIR}/Lists/4FB_Val_PiB"
 S3_REG_CSV_PIB="${LIST_DIR_PIB}/s3_petmni_registration.csv"
 
-LIST_DIR_FBP="${PROJ_DIR}/Lists/3FB_Val_FBP"
+LIST_DIR_FBP="${PROJ_DIR}/Lists/4FB_Val_FBP"
 S3_REG_CSV_FBP="${LIST_DIR_FBP}/s3_petmni_registration.csv"
 
-LIST_DIR_OUT="${PROJ_DIR}/Lists/3FB_Val_B_WC"
-PROTO_DIR_OUT="${PROJ_DIR}/Protocols/3FB_Val_B_WC"
-LOG_DIR="${PROJ_DIR}/Logs/3FB_Val_B_WC"
+LIST_DIR_OUT="${PROJ_DIR}/Lists/4FB_Val_B_WC"
+PROTO_DIR_OUT="${PROJ_DIR}/Protocols/4FB_Val_B_WC"
+LOG_DIR="${PROJ_DIR}/Logs/4FB_Val_B_WC"
 
 ATLAS_DIR="${PROJ_DIR}/Data/Atlases"
 SCRIPTS_DIR="${PROJ_DIR}/Scripts/Validation"

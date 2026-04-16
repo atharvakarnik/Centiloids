@@ -13,8 +13,8 @@
 set -euo pipefail
 
 PROJ_DIR="${PROJ_DIR:-${HOME}/Pipelines/Centiloids}"
-LIST_DIR="${LIST_DIR:-${PROJ_DIR}/Lists/3Validation}"
-PROTO_DIR="${PROTO_DIR:-${PROJ_DIR}/Protocols/3Validation}"
+LIST_DIR="${LIST_DIR:-${PROJ_DIR}/Lists/4Validation}"
+PROTO_DIR="${PROTO_DIR:-${PROJ_DIR}/Protocols/4Validation}"
 
 OURS_CSV="${OURS_CSV:-${LIST_DIR}/s4_suvrcl_status.csv}"
 REF_CSV="${REF_CSV:-${LIST_DIR}/GAAIN/gaain_reference_scores.csv}"
@@ -38,7 +38,10 @@ echo
 
 # 'module' is the basic command that should've been universally visible :/
 if ! command -v module >/dev/null 2>&1; then
-  source /usr/share/Modules/init/bash 2>/dev/null || true
+    if [ -f $CUBICLOCAL/lmod/lmod/init/bash ]; then
+      # shellcheck disable=SC1091
+      source $CUBICLOCAL/lmod/lmod/init/bash >/dev/null 2>&1 || true
+    fi
 fi
 
 module load python/3.11 >/dev/null 2>&1 || {
