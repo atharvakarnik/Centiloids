@@ -29,9 +29,9 @@ PET_TAG="PET_3D"
 # ---------------------------------------------------------------- #
 
 SCRIPTS_DIR="${PROJ_DIR}/Scripts"
-LIST_DIR="${PROJ_DIR}/Lists/2DPPOS_Feb26PET"
-PROTO_DIR="${PROJ_DIR}/Protocols/2DPPOS_Feb26PET"
-DATA_DIR="${PROJ_DIR}/Data/Nifti/Feb26PET_PET"
+LIST_DIR="${PROJ_DIR}/Lists/Jun26"
+PROTO_DIR="${PROJ_DIR}/Protocols/Jun26"
+DATA_DIR="${PROJ_DIR}/Data/Nifti/Jun26PET_PET"
 
 mkdir -p "${SCRIPTS_DIR}" "${LIST_DIR}" "${PROTO_DIR}"
 

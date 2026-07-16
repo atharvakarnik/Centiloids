@@ -25,7 +25,7 @@
 #SBATCH --partition=all
 #SBATCH --propagate=NONE
 #SBATCH --job-name=PET_Preproc
-#SBATCH --output=Logs/2DPPOS_Feb26PET/PET_Preproc_%A_%a.log
+#SBATCH --output=Logs/Jun26/PET_Preproc_%A_%a.log
 #SBATCH --time=00:10:00
 #SBATCH --cpus-per-task=1
 #SBATCH --mem=4G

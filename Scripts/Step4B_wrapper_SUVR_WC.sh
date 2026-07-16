@@ -11,10 +11,10 @@ set -euo pipefail
 # USER CONFIG
 ############################################
 PROJ_DIR="${HOME}/Pipelines/Centiloids"
-DATASET="DPPOS_Feb26PET"
+DATASET="Jun26"
 
-LIST_DIR="${PROJ_DIR}/Lists/2${DATASET}"
-PROTO_DIR="${PROJ_DIR}/Protocols/2${DATASET}"
+LIST_DIR="${PROJ_DIR}/Lists/${DATASET}"
+PROTO_DIR="${PROJ_DIR}/Protocols/${DATASET}"
 ATLAS_DIR="${PROJ_DIR}/Data/Atlases"
 SCRIPTS_DIR="${PROJ_DIR}/Scripts"
 
@@ -82,7 +82,7 @@ echo "Submitting Step4B array: ${ARRAY_RANGE} (n=${n})"
 
 jobid=$(sbatch --parsable \
   --job-name="${DATASET}_SUVR_WC" \
-  --output="${PROJ_DIR}/Logs/2${DATASET}/S4B_SUVR_WC_%A_%a.log" \
+  --output="${PROJ_DIR}/Logs/${DATASET}/S4B_SUVR_WC_%A_%a.log" \
   --time=00:10:00 --mem=2G --cpus-per-task=1 \
   --export=PROJ_DIR="${PROJ_DIR}",PROTO_DIR="${PROTO_DIR}",LIST_DIR="${LIST_DIR}",SUBJECT_LIST="${SUBJECT_LIST}",VOI_CTX="${VOI_CTX}",VOI_WC="${VOI_WC}",FSLOUTPUTTYPE='NIFTI_GZ' \
   --array="${ARRAY_RANGE}" "${SCRIPTS_DIR}/Step4B_SUVR_WC.sh")
@@ -92,7 +92,7 @@ echo "Step4B array job id: ${jobid}"
 echo "Submitting finalize job (afterok:${jobid})"
 sbatch \
   --job-name="${DATASET}_S4B_finalize" \
-  --output="${PROJ_DIR}/Logs/2${DATASET}/S4B_finalize_%j.log" \
+  --output="${PROJ_DIR}/Logs/${DATASET}/S4B_finalize_%j.log" \
   --dependency=afterok:"${jobid}" \
   --time=00:05:00 --mem=2G --cpus-per-task=1 \
   --export=PROTO_DIR="${PROTO_DIR}",LIST_DIR="${LIST_DIR}",STATUS_CSV="${STATUS_CSV}",DATASET="${DATASET}" \

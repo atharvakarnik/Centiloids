@@ -7,8 +7,8 @@ PET_TAG="PET_3D"
 # ---------------------------------------------------------------- #
 
 PROJ_DIR="${HOME}/Pipelines/Centiloids"
-LIST_DIR="${PROJ_DIR}/Lists/2DPPOS_Feb26PET"
-PROTO_DIR="${PROJ_DIR}/Protocols/2DPPOS_Feb26PET"
+LIST_DIR="${PROJ_DIR}/Lists/Jun26"
+PROTO_DIR="${PROJ_DIR}/Protocols/Jun26"
 REORIENT_DIR="${PROJ_DIR}/Data/ReOrientedLPS"
 SCRIPTS_DIR="${PROJ_DIR}/Scripts"
 

@@ -14,8 +14,8 @@ set -euo pipefail
 
 PROJ_DIR="${HOME}/Pipelines/Centiloids"
 
-LIST_DIR="${PROJ_DIR}/Lists/2DPPOS_Feb26PET"
-PROTO_DIR="${PROJ_DIR}/Protocols/2DPPOS_Feb26PET"
+LIST_DIR="${PROJ_DIR}/Lists/Jun26"
+PROTO_DIR="${PROJ_DIR}/Protocols/Jun26"
 REORIENT_DIR="${PROJ_DIR}/Data/ReOrientedLPS"
 DLICV_DIR="${PROJ_DIR}/Data/DLICV"      # Optional masks (not used in worker unless you enable it)
 ATLAS_DIR="${PROJ_DIR}/Data/Atlases"
@@ -25,7 +25,7 @@ mkdir -p "${LIST_DIR}" "${PROTO_DIR}"
 
 # MNI Template
 # MNI_TEMPLATE="${ATLAS_DIR}/MNI152_T1_1mm.nii.gz"
-MNI_TEMPLATE="${ATLAS_DIR}/avg152T1.nii.gz"
+MNI_TEMPLATE="${ATLAS_DIR}/MNI152_T1_2mm.nii.gz"
 
 # ----------------------------
 # Step2 Registration Mode
@@ -33,8 +33,8 @@ MNI_TEMPLATE="${ATLAS_DIR}/avg152T1.nii.gz"
 #   Syn     : Original antsRegistrationSyN.sh workflow
 #   SPMlike : SPM-unified-like workflow using tissue priors (FSL priors) via Atropos + multi-channel ANTs reg
 #
-T1_MNI_MODE="SPMlike"
-# T1_MNI_MODE="Syn"
+# T1_MNI_MODE="SPMlike"
+T1_MNI_MODE="Syn"
 
 # Stage-1 mapping list
 S1_SELECTION="${LIST_DIR}/s1_pet2t1_selection_T1.csv"
@@ -99,6 +99,10 @@ tail -n +2 "${S1_SELECTION}" | awk -F',' '{print $1,$2,$3}' | sort -u | while re
     echo "${site} ${sub} ${subLong}" >> "${SUBJECT_LIST}"
     echo "${site},${sub},${subLong},${mask_note}" >> "${SELECTION_T1_CSV}"
 done
+
+################ VERY TEMPORARY OVERRIDE !! ################
+# SUBJECT_LIST="${LIST_DIR}/s2_t1mni_subjects_only212063.csv" ##
+############################################################
 
 n=$(wc -l < "${SUBJECT_LIST}" | tr -d ' ')
 

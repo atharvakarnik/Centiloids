@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/env bash
 #
 # ------------------------------------------------- #
 #     Adapted from GAAIN's vld to DPPOS Dataset     #
@@ -16,8 +16,8 @@ set -euo pipefail
 
 PROJ_DIR="${HOME}/Pipelines/Centiloids"
 
-LIST_DIR="${PROJ_DIR}/Lists/2DPPOS_Feb26PET"
-PROTO_DIR="${PROJ_DIR}/Protocols/2DPPOS_Feb26PET"
+LIST_DIR="${PROJ_DIR}/Lists/Jun26"
+PROTO_DIR="${PROJ_DIR}/Protocols/Jun26"
 REG_PET_T1_DIR="${PROTO_DIR}/Registration_PET_to_T1"
 REG_T1_MNI_DIR="${PROTO_DIR}/Registration_T1_to_MNI"
 ATLAS_DIR="${PROJ_DIR}/Data/Atlases"
@@ -26,7 +26,7 @@ SCRIPTS_DIR="${PROJ_DIR}/Scripts"
 mkdir -p "${LIST_DIR}" "${PROTO_DIR}"
 
 # MNI_TEMPLATE="${ATLAS_DIR}/MNI152_T1_1mm.nii.gz"      # Need to use SPM-provided 2mm template for GAAIN-validation
-MNI_TEMPLATE="${ATLAS_DIR}/avg152T1.nii.gz"
+MNI_TEMPLATE="${ATLAS_DIR}/MNI152_T1_2mm.nii.gz"        # Replaced avg152T1
 
 # Stage 2 registration log (used as source for subjects)
 S2_REG_CSV="${LIST_DIR}/s2_t1mni_registration.csv"
@@ -85,7 +85,7 @@ tail -n +2 "${S2_REG_CSV}" | while IFS=',' read -r site sub subLong t1_path mni_
 
     # Only proceed for successful or pre-existing T1->MNI regs
     case "${note}" in
-        OK|already_registered|ok_SyN|ok_SPMlike) ;;
+        OK|already_registered|ok_Syn|ok_SPMlike) ;;
         *) 
             echo "  [${site}/${sub}/${subLong}] Stage-2 NOTE='${note}', skipping for Stage 3."
             continue

@@ -20,12 +20,13 @@
 #   bash Step1_wrapper_PET2T1.sh
 #
 #SBATCH --job-name=PET2T1
-#SBATCH --output=Logs/2DPPOS_Feb26PET/PET2T1_%A_%a.log
+#SBATCH --output=Logs/Jun26/PET2T1_%A_%a.log
 #SBATCH --time=3:00:00
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=16G
 
-set -euo pipefail
+set -Eeuo pipefail
+trap 'echo "ERROR: line ${LINENO}: ${BASH_COMMAND}" >&2' ERR
 
 : "${PROJ_DIR:?PROJ_DIR is not set}"
 : "${PROTO_DIR:?PROTO_DIR is not set}"
@@ -35,13 +36,91 @@ set -euo pipefail
 : "${S0B_CSV:?S0B_CSV is not set}"
 : "${PET_TAG:?PET_TAG is not set}"
 
+# Make the batch shell deterministic. Not depending COMPLETELY on the submit shell's PATH.
+export PATH="/usr/local/bin:/usr/bin:/bin${PATH:+:${PATH}}"
+export LD_LIBRARY_PATH="${LD_LIBRARY_PATH:-}"
+
+prepend_path() {
+    local var="$1" dir="$2" old="${!var-}"
+    [[ -d "${dir}" ]] || return 0
+    case ":${old}:" in
+        *":${dir}:"*) ;;
+        *) export "${var}=${dir}${old:+:${old}}" ;;
+    esac
+}
+
+LMOD_INIT="${LMOD_INIT:-/cubic/software/centos7/lmod/lmod/init/bash}"
+
+# ---------------------------------------------------
+# For some reason... module command is not visible...
+if ! command -v module >/dev/null 2>&1; then
+    echo "NOTE: Initializing Lmod from ${LMOD_INIT}"
+    [[ -r "${LMOD_INIT}" ]] || {
+        echo "ERROR: Lmod init file is not readable: ${LMOD_INIT}" >&2
+        exit 127
+    }
+    set +u
+    . "${LMOD_INIT}"
+    set -u
+fi
+
+export OSrelease="${OSrelease:-centos7}"
+export ARCH="${ARCH:-$(uname -m)}"
+
+module use /cbica/share/modules
+module load gcc/5.2.0
+module load ants/2.3.1
+
 export OMP_NUM_THREADS="${SLURM_CPUS_PER_TASK:-1}"
 export ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS="${SLURM_CPUS_PER_TASK:-1}"
 export OMP_PROC_BIND=true
 export OMP_PLACES=cores
+export FSLOUTPUTTYPE="NIFTI_GZ"
 
 REG_ROOT="${PROTO_DIR}/Registration_PET_to_T1"
 mkdir -p "${REG_ROOT}" "${LIST_DIR}"
+
+# ------- CPU Time limit exceeded - debugging -------
+# Show inherited CPU-time limit for debugging
+echo "ulimit -St before: $(ulimit -St)"
+echo "ulimit -Ht before: $(ulimit -Ht)"
+
+# Try to remove inherited CPU-time cap
+ulimit -St unlimited 2>/dev/null || true
+ulimit -Ht unlimited 2>/dev/null || true
+
+# Show effective limit after reset
+echo "ulimit -St after : $(ulimit -St)"
+echo "ulimit -Ht after : $(ulimit -Ht)"
+# ---------------------------------------------------
+
+# ------- I can't tolerate ANTs not visible to 10% nodes in the same parition! -------
+ANTS_ROOT="${ANTS_ROOT:-/cbica/software/external/ants/centos7/2.3.1}"
+ANTS_REQUIRED_CMD="antsRegistration"
+
+[[ -x "${ANTS_ROOT}/bin/${ANTS_REQUIRED_CMD}" ]] || {
+    echo "ERROR: Expected ANTs executable not found: ${ANTS_ROOT}/bin/${ANTS_REQUIRED_CMD}" >&2
+    exit 127
+}
+
+export ANTSPATH="${ANTS_ROOT}/bin/"
+prepend_path PATH "${ANTS_ROOT}/bin"
+prepend_path LD_LIBRARY_PATH "${ANTS_ROOT}/lib"
+prepend_path LD_LIBRARY_PATH "${ANTS_ROOT}/ITKv5-install/lib"
+hash -r
+
+ANTS_EXE="$(command -v "${ANTS_REQUIRED_CMD}")"
+libstdcpp="$(ldd "${ANTS_EXE}" 2>/dev/null | awk '/libstdc\+\+/{print $3; exit}' || true)"
+
+echo "ANTS_EXE           : ${ANTS_EXE}"
+echo "libstdc++          : ${libstdcpp:-not_found}"
+
+[[ -n "${libstdcpp:-}" && "${libstdcpp}" != /lib64/* ]] || {
+    echo "ERROR: ANTs is using old or unresolved libstdc++: ${libstdcpp:-not_found}" >&2
+    exit 126
+}
+
+# --------------------------------------------------------------------------------------
 
 # Stage-1 registration logs
 SELECTION_CSV="${LIST_DIR}/s1_pet2t1_registration.csv"

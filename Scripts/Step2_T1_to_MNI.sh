@@ -11,8 +11,8 @@
 #SBATCH --propagate=NONE
 #SBATCH --partition=all
 #SBATCH --job-name=T1_MNI
-#SBATCH --output=Logs/2DPPOS_Feb26PET/T1_MNI_%A_%a.log
-#SBATCH --time=01:30:00
+#SBATCH --output=Logs/Jun26/T1_MNI_%A_%a.log
+#SBATCH --time=05:30:00
 #SBATCH --cpus-per-task=8
 #SBATCH --mem-per-cpu=6G
 
@@ -29,8 +29,87 @@ set -euo pipefail
 
 : "${T1_MNI_MODE:=Syn}"   # Syn (default) or SPMlike (now: tissue-prior guided unified-like)
 
+# Make the batch shell deterministic. Not depending COMPLETELY on the submit shell's PATH.
+export PATH="/usr/local/bin:/usr/bin:/bin${PATH:+:${PATH}}"
+
+# ---------------------------------------------------
+# For some reason... module command is not visible...
+prepend_path() {
+    local var="$1"
+    local dir="$2"
+    local old="${!var-}"
+    [[ -d "${dir}" ]] || return 0
+    case ":${old}:" in
+        *":${dir}:"*) ;;
+        *) export "${var}=${dir}${old:+:${old}}" ;;
+    esac
+}
+
+LMOD_INIT="${LMOD_INIT:-/cubic/software/centos7/lmod/lmod/init/bash}"
+
+if ! command -v module >/dev/null 2>&1; then
+    echo "NOTE: Initializing Lmod from ${LMOD_INIT}"
+    if [[ -r "${LMOD_INIT}" ]]; then
+        set +u
+        . "${LMOD_INIT}"
+        set -u
+    else
+        echo "ERROR: Lmod init file is not readable: ${LMOD_INIT}" >&2
+        exit 127
+    fi
+fi
+
+export OSrelease="${OSrelease:-centos7}"
+export ARCH="${ARCH:-$(uname -m)}"
+
+module use /cbica/share/modules
+module load gcc/5.2.0
+module load ants/2.3.1
+
 threads="${SLURM_CPUS_PER_TASK:-8}"
 export ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS="${threads}"
+
+# ------- I can't tolerate ANTs not visible to 10% nodes in the same parition! -------
+ANTS_ROOT="${ANTS_ROOT:-/cbica/software/external/ants/centos7/2.3.1}"
+ANTS_REQUIRED_CMD="antsRegistration"
+
+if [[ ! -x "${ANTS_ROOT}/bin/${ANTS_REQUIRED_CMD}" ]]; then
+    echo "ERROR: Expected ANTs executable not found: ${ANTS_ROOT}/bin/${ANTS_REQUIRED_CMD}" >&2
+    exit 127
+fi
+
+export ANTSPATH="${ANTS_ROOT}/bin/"
+prepend_path PATH "${ANTS_ROOT}/bin"
+prepend_path LD_LIBRARY_PATH "${ANTS_ROOT}/lib"
+prepend_path LD_LIBRARY_PATH "${ANTS_ROOT}/ITKv5-install/lib"
+hash -r
+
+ANTS_EXE="$(command -v "${ANTS_REQUIRED_CMD}")"
+
+echo "ANTS_EXE           : ${ANTS_EXE}"
+echo "ANTSPATH           : ${ANTSPATH}"
+echo "LD_LIBRARY_PATH    : ${LD_LIBRARY_PATH:-}"
+
+if command -v ldd >/dev/null 2>&1 && command -v grep >/dev/null 2>&1; then
+    libstdcpp="$(ldd "${ANTS_EXE}" 2>/dev/null | awk '/libstdc\+\+/{print $3; exit}' || true)"
+    echo "libstdc++          : ${libstdcpp:-not_found}"
+
+    if [[ -z "${libstdcpp}" || ! -r "${libstdcpp}" ]]; then
+        echo "ERROR: Could not resolve libstdc++.so.6 for ${ANTS_REQUIRED_CMD}" >&2
+        exit 126
+    fi
+
+    if [[ "${libstdcpp}" == /lib64/* ]]; then
+        echo "ERROR: ANTs is using old system libstdc++: ${libstdcpp}" >&2
+        exit 126
+    fi
+
+    if ! grep -a -q 'GLIBCXX_3\.4\.20' "${libstdcpp}"; then
+        echo "ERROR: ${libstdcpp} lacks GLIBCXX_3.4.20" >&2
+        exit 126
+    fi
+fi
+# --------------------------------------------------------------------------------------
 
 REG_ROOT="${PROTO_DIR}/Registration_T1_to_MNI"
 mkdir -p "${REG_ROOT}" "${LIST_DIR}"
