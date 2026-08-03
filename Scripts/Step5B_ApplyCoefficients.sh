@@ -11,7 +11,7 @@
 set -euo pipefail
 
 : "${PROJ_DIR:=${HOME}/Pipelines/Centiloids}"
-: "${DATASET:=Jun26}"
+: "${DATASET:=3DPPOS_Feb26PET}"
 
 LIST_DIR="${PROJ_DIR}/Lists/${DATASET}"
 PROTO_DIR="${PROJ_DIR}/Protocols/${DATASET}"
