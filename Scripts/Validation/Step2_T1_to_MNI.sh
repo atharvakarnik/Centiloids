@@ -26,7 +26,7 @@
 #SBATCH --propagate=NONE
 #SBATCH --partition=all
 #SBATCH --job-name=T1_MNI
-#SBATCH --output=Logs/2FB_Val_FBP/T1_MNI_%A_%a.log
+#SBATCH --output=Logs/4FB_Val_FBP/T1_MNI_%A_%a.log
 #SBATCH --time=6:30:00
 #SBATCH --cpus-per-task=8
 #SBATCH --mem-per-cpu=6G
@@ -44,12 +44,53 @@ set -euo pipefail
 
 : "${T1_MNI_MODE:=Syn}"   # Syn (default) or SPMlike (tissue-prior guided unified-like)
 
+# ---------------------------------------------------
+# For some reason... module command is not visible...
+if ! command -v module >/dev/null 2>&1; then
+    if [ -f $CUBICLOCAL/lmod/lmod/init/bash ]; then
+      # shellcheck disable=SC1091
+      source $CUBICLOCAL/lmod/lmod/init/bash >/dev/null 2>&1 || true
+    fi
+fi
+
+if command -v module >/dev/null 2>&1; then
+    module use /cbica/share/modules || true
+    module load ants/2.3.1 || true
+fi
+# ---------------------------------------------------
+
 threads="${SLURM_CPUS_PER_TASK:-8}"
 export ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS="${threads}"
 export OMP_NUM_THREADS="${threads}"
 
 REG_ROOT="${PROTO_DIR}/Registration_T1_to_MNI"
 mkdir -p "${REG_ROOT}" "${LIST_DIR}"
+
+# ------- I can't tolerate ANTs not visible to 10% nodes in the same parition! -------
+# --- Minimal ANTs initialization ---
+ANTS_ROOT="/cbica/software/external/ANTs/centos7/2.3.1"
+ANTS_REQUIRED_CMD="antsRegistration"
+
+# Only initialize ANTs if it is not already visible
+if ! command -v "${ANTS_REQUIRED_CMD}" >/dev/null 2>&1; then
+    if [ -x "${ANTS_ROOT}/bin/${ANTS_REQUIRED_CMD}" ]; then
+        export ANTSPATH="${ANTS_ROOT}/bin/"
+        export PATH="${ANTS_ROOT}/bin:${PATH}"
+        export LD_LIBRARY_PATH="${ANTS_ROOT}/lib:${ANTS_ROOT}/ITKv5-install/lib:${LD_LIBRARY_PATH:-}"
+        hash -r
+    else
+        echo "ERROR: ANTs not available. Expected executable not found at:" >&2
+        echo "  ${ANTS_ROOT}/bin/${ANTS_REQUIRED_CMD}" >&2
+        exit 127
+    fi
+fi
+
+# Final sanity check
+if ! command -v "${ANTS_REQUIRED_CMD}" >/dev/null 2>&1; then
+    echo "ERROR: Failed to initialize ANTs; '${ANTS_REQUIRED_CMD}' is still not in PATH." >&2
+    exit 127
+fi
+# --------------------------------------------------------------------------------------
 
 # Stage-2 logs
 REG_CSV="${LIST_DIR}/s2_t1mni_registration.csv"
@@ -140,11 +181,23 @@ fi
 if [ "${T1_MNI_MODE}" = "Syn" ]; then
     echo "  -> Using antsRegistrationSyN.sh (baseline)"
     echo "     Threads: ${threads}, Mask used: ${mask_used}"
+    INIT_MAT="${out_dir}/${subLong}_T1_rMNI_init.mat"
+
+    antsAI \
+        -d 3 \
+        -m MI["${MNI_TEMPLATE}","${t1}",32,Regular,0.25] \
+        -t Rigid[0.1] \
+        -s [1,0.015] \
+        -g [40,0x40x40] \
+        -c [10,1e-6,10] \
+        -o "${INIT_MAT}" \
+        -v 1
 
     antsRegistrationSyN.sh \
         -d 3 \
         -f "${MNI_TEMPLATE}" \
         -m "${t1}" \
+        -i "${INIT_MAT}" \
         -o "${out_prefix}" \
         -n "${threads}"
         # "${args_mask[@]}"  # enable if you want to constrain with mask
@@ -172,17 +225,30 @@ elif [ "${T1_MNI_MODE}" = "SPMlike" ]; then
     echo "    [1/5] N4 bias correction..."
     N4BiasFieldCorrection -d 3 -i "${t1}" -o "${t1_n4}" -v 1
 
+    init_ai="${work}/${subLong}_init_ai.mat"
+    echo "    [2/6] antsAI rigid initialization..."
+    antsAI \
+      -d 3 \
+      -m MI["${MNI_TEMPLATE}","${t1_n4}",32,Regular,0.25] \
+      -t Rigid[0.1] \
+      -s [1,0.015] \
+      -g [40,0x40x40] \
+      -c [10,1e-6,10] \
+      -o "${init_ai}" \
+      -v 1
+
     # Initial low-DOF alignment to pull priors into subject space reliably
     init_prefix="${work}/${subLong}_init_"
-    echo "    [2/5] Initial Rigid+Affine (for prior warping)..."
+    echo "    [3/6] Initial Rigid+Affine (for prior warping)..."
     antsRegistration \
       -d 3 \
       --float 1 \
       --verbose 0 \
       --winsorize-image-intensities [0.005,0.995] \
       --use-histogram-matching 0 \
+      --initial-moving-transform "${init_ai}" \
       -o ["${init_prefix}","${init_prefix}Warped.nii.gz","${init_prefix}InverseWarped.nii.gz"] \
-      -r ["${MNI_TEMPLATE}","${t1_n4}",1] \
+      -r ["${MNI_TEMPLATE}","${t1_n4}",0] \
       -t Rigid[0.1] \
       -m MI["${MNI_TEMPLATE}","${t1_n4}",1,32,Regular,0.25] \
       -c [1000x500x250x100,1e-6,10] \
@@ -202,7 +268,7 @@ elif [ "${T1_MNI_MODE}" = "SPMlike" ]; then
     # Warp priors (template space) into subject space using inverse affine
     # Create Atropos prior set as %02d in subject space (01=GM, 02=WM, 03=CSF)
     prior_subj_pat="${work}/${subLong}_prior_subj_%02d.nii.gz"
-    echo "    [3/5] Warping priors to subject space..."
+    echo "    [4/6] Warping priors to subject space..."
     antsApplyTransforms -d 3 -r "${t1_n4}" -i "${prior_gm}"  -o "$(printf "${prior_subj_pat}" 1)" -n Linear -t ["${init_aff}",1]
     antsApplyTransforms -d 3 -r "${t1_n4}" -i "${prior_wm}"  -o "$(printf "${prior_subj_pat}" 2)" -n Linear -t ["${init_aff}",1]
     antsApplyTransforms -d 3 -r "${t1_n4}" -i "${prior_csf}" -o "$(printf "${prior_subj_pat}" 3)" -n Linear -t ["${init_aff}",1]
@@ -210,7 +276,7 @@ elif [ "${T1_MNI_MODE}" = "SPMlike" ]; then
     # Atropos segmentation with priors -> subject tissue posteriors
     post_pat="${work}/${subLong}_post_%02d.nii.gz"
     seg="${work}/${subLong}_seg.nii.gz"
-    echo "    [4/5] Atropos segmentation (GM/WM/CSF posteriors)..."
+    echo "    [5/6] Atropos segmentation (GM/WM/CSF posteriors)..."
 
     # Build a binary mask from the warped priors (operate only where priors indicate brain)
     prior1="$(printf "${prior_subj_pat}" 1)"
@@ -237,7 +303,7 @@ elif [ "${T1_MNI_MODE}" = "SPMlike" ]; then
 
     # Now do multi-channel registration: T1 + (GM/WM/CSF) channels
     # fixed: template T1, template priors; moving: subject T1, subject posteriors
-    echo "    [5/5] Multi-channel registration (T1 + tissue channels)..."
+    echo "    [6/6] Multi-channel registration (T1 + tissue channels)..."
     antsRegistration \
       -d 3 \
       --float 1 \
@@ -268,13 +334,21 @@ else
     exit 1
 fi
 
-required_files=(
-  "${out_prefix}0GenericAffine.mat"
-  "${out_prefix}1Warp.nii.gz"
-  "${out_prefix}1InverseWarp.nii.gz"
-  "${out_prefix}Warped.nii.gz"
-  "${out_prefix}InverseWarped.nii.gz"
-)
+if [ "${T1_MNI_MODE}" = "Syn" ]; then
+  required_files=(
+    "${out_prefix}0GenericAffine.mat"
+    "${out_prefix}1Warp.nii.gz"
+    "${out_prefix}1InverseWarp.nii.gz"
+  )
+else
+  required_files=(
+    "${out_prefix}0GenericAffine.mat"
+    "${out_prefix}1Warp.nii.gz"
+    "${out_prefix}1InverseWarp.nii.gz"
+    "${out_prefix}Warped.nii.gz"
+    "${out_prefix}InverseWarped.nii.gz"
+  )
+fi
 
 missing=0
 for f in "${required_files[@]}"; do

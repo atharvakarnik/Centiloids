@@ -19,11 +19,13 @@
 # Submit via wrapper:
 #   bash Step1_wrapper_PET2T1.sh
 #
+#SBATCH --partition=all
+#SBATCH --propagate=NONE
 #SBATCH --job-name=PET2T1
-#SBATCH --output=Logs/2Validation/PET2T1_%A_%a.log
-#SBATCH --time=3:00:00
-#SBATCH --cpus-per-task=4
-#SBATCH --mem=16G
+#SBATCH --output=Logs/4FB_Val_FBP/PET2T1_%A_%a.log
+#SBATCH --time=01:20:00
+#SBATCH --cpus-per-task=6
+#SBATCH --mem=8G
 
 set -euo pipefail
 
@@ -35,13 +37,75 @@ set -euo pipefail
 : "${S0B_CSV:?S0B_CSV is not set}"
 : "${PET_TAG:?PET_TAG is not set}"
 
+# For some reason... module command is not visible...
+if ! command -v module >/dev/null 2>&1; then
+    if [ -f $CUBICLOCAL/lmod/lmod/init/bash ]; then
+      # shellcheck disable=SC1091
+      source $CUBICLOCAL/lmod/lmod/init/bash >/dev/null 2>&1 || true
+    fi
+fi
+
+if command -v module >/dev/null 2>&1; then
+    module use /cbica/share/modules || true
+    module load ants/2.3.1 || true
+fi
+
 export OMP_NUM_THREADS="${SLURM_CPUS_PER_TASK:-1}"
 export ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS="${SLURM_CPUS_PER_TASK:-1}"
+unset OMP_THREAD_LIMIT
 export OMP_PROC_BIND=true
 export OMP_PLACES=cores
 
+# ------- CPU Time limit exceeded - debugging -------
+# Show inherited CPU-time limit for debugging
+echo "ulimit -St before: $(ulimit -St)"
+echo "ulimit -Ht before: $(ulimit -Ht)"
+
+# Try to remove inherited CPU-time cap
+ulimit -St unlimited 2>/dev/null || true
+ulimit -Ht unlimited 2>/dev/null || true
+
+# Show effective limit after reset
+echo "ulimit -St after : $(ulimit -St)"
+echo "ulimit -Ht after : $(ulimit -Ht)"
+# ---------------------------------------------------
+
 REG_ROOT="${PROTO_DIR}/Registration_PET_to_T1"
 mkdir -p "${REG_ROOT}" "${LIST_DIR}"
+
+# ------- For some reason... ANTs not visible to 10% nodes in the same parition! -------
+# --- ANTs initialization ---
+ANTS_ROOT="/cbica/software/external/ANTs/centos7/2.3.1"
+ANTS_REQUIRED_CMD="antsRegistration"
+
+# Only initialize ANTs if it is not already visible
+if ! command -v "${ANTS_REQUIRED_CMD}" >/dev/null 2>&1; then
+    if [ -x "${ANTS_ROOT}/bin/${ANTS_REQUIRED_CMD}" ]; then
+        export ANTSPATH="${ANTS_ROOT}/bin/"
+        export PATH="${ANTS_ROOT}/bin:${PATH}"
+        export LD_LIBRARY_PATH="${ANTS_ROOT}/lib:${ANTS_ROOT}/ITKv5-install/lib:${LD_LIBRARY_PATH:-}"
+        hash -r
+    else
+        echo "ERROR: ANTs not available. Expected executable not found at:" >&2
+        echo "  ${ANTS_ROOT}/bin/${ANTS_REQUIRED_CMD}" >&2
+        exit 127
+    fi
+fi
+
+# echo "-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-"
+# echo "HOSTNAME: $(hostname)"
+# echo "KERNEL  : $(uname -r)"
+# echo "OS info : $(cat /etc/os-release 2>/dev/null || true)"
+# echo "which antsRegistration: $(command -v antsRegistration || echo not_found)"
+# echo "OSrelease env: ${OSrelease:-unset}"
+# echo "-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-x-"
+
+# Final sanity check
+if ! command -v "${ANTS_REQUIRED_CMD}" >/dev/null 2>&1; then
+    echo "ERROR: Failed to initialize ANTs; '${ANTS_REQUIRED_CMD}' is still not in PATH." >&2
+    exit 127
+fi
+# --------------------------------------------------------------------------------------
 
 # Stage-1 registration logs
 SELECTION_CSV="${LIST_DIR}/s1_pet2t1_registration.csv"
@@ -155,16 +219,22 @@ fi
 #     exit 1
 # fi
 
-echo "  -> Running ANTs rigid (PET -> T1)..."
+echo "  -> Running ANTs rigid+affine (PET -> T1)..."
 
 prefix="${out_dir}/${subLong}_PET2T1_"
 
 antsRegistration -d 3 \
   -o ["${prefix}","${prefix}Warped.nii.gz"] \
   --float 1 \
+  --winsorize-image-intensities [0.005,0.995] \
   --use-histogram-matching 0 \
   -r ["${t1}","${pet_in}",1] \
   -t Rigid[0.1] \
+  -m MI["${t1}","${pet_in}",1,32,Regular,0.25] \
+  -c [1000x500x250x100,1e-6,10] \
+  -s 3x2x1x0vox \
+  -f 8x4x2x1 \
+  -t Affine[0.1] \
   -m MI["${t1}","${pet_in}",1,32,Regular,0.25] \
   -c [1000x500x250x100,1e-6,10] \
   -s 3x2x1x0vox \
@@ -176,6 +246,7 @@ mv -f "${prefix}Warped.nii.gz" "${out_pet_rT1}"
 # mv -f "${prefix}0GenericAffine.mat" "${out_mat}"
 
 # Optional: keep directory clean
+rm -f "${prefix}"0GenericAffine.mat 2>/dev/null || true
 rm -f "${prefix}"InverseWarped.nii.gz 2>/dev/null || true
 
 echo "${site},${sub},${subLong},${pet_og},${t1},OK;${pet_note}" >> "${SELECTION_CSV}"

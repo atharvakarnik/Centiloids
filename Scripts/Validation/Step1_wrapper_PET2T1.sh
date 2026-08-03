@@ -13,15 +13,15 @@
 set -euo pipefail
 
 # IMPORTANT : Check this var meticulously to state correct cohort!!! 
-PET_TAG="PET_PiB"
+PET_TAG="PET_FBP"
 # ---------------------------------------------------------------- #
 
 PROJ_DIR="${HOME}/Pipelines/Centiloids"
 
-LIST_DIR="${PROJ_DIR}/Lists/2Validation"
-PROTO_DIR="${PROJ_DIR}/Protocols/2Validation"
+LIST_DIR="${PROJ_DIR}/Lists/4FB_Val_FBP"
+PROTO_DIR="${PROJ_DIR}/Protocols/4FB_Val_FBP"
 PREPROC_PET_ROOT="${PROTO_DIR}/PET_Preproc"
-REORIENT_DIR="${PROJ_DIR}/Data/Validation/ReOrientedLPS"
+REORIENT_DIR="${PROJ_DIR}/Data/Validation_FBP/ReOrientedLPS"
 SCRIPTS_DIR="${PROJ_DIR}/Scripts/Validation"
 
 mkdir -p "${LIST_DIR}" "${PROTO_DIR}"
@@ -112,6 +112,10 @@ for site_dir in "${PREPROC_PET_ROOT}"/*; do
     done
 done
 
+# TEMP for 2 subs that exceeded CPU limit
+# SUBJECT_LIST="${LIST_DIR}/s1_pet2t1_subjects_2CPUXceeds.csv"
+# TEMP ends here. Clear the above if I don't, please :)
+
 n=$(wc -l < "${SUBJECT_LIST}")
 
 if [ "${n}" -eq 0 ]; then
@@ -129,7 +133,7 @@ ARRAY_RANGE="0-$((n - 1))"
 echo "Submitting SLURM array job for ${ARRAY_RANGE}..."
 
 sbatch \
-    --export=PROJ_DIR="${PROJ_DIR}",PROTO_DIR="${PROTO_DIR}",REORIENT_DIR="${REORIENT_DIR}",LIST_DIR="${LIST_DIR}",SUBJECT_LIST="${SUBJECT_LIST}",S0B_CSV="${S0B_CSV}",PET_TAG="${PET_TAG}",FSLOUTPUTTYPE='NIFTI_GZ' \
+    --export=PROJ_DIR="${PROJ_DIR}",PROTO_DIR="${PROTO_DIR}",REORIENT_DIR="${REORIENT_DIR}",LIST_DIR="${LIST_DIR}",SUBJECT_LIST="${SUBJECT_LIST}",S0B_CSV="${S0B_CSV}",PET_TAG="${PET_TAG}",PATH="${PATH}",FSLOUTPUTTYPE='NIFTI_GZ' \
     --array="${ARRAY_RANGE}" "${SCRIPTS_DIR}/Step1_PET2T1.sh"
 
 echo "Submitted!"

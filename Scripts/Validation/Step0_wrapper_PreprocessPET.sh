@@ -25,12 +25,12 @@ set -euo pipefail
 PROJ_DIR="${HOME}/Pipelines/Centiloids"
 
 # IMPORTANT : Check this var meticulously to state correct cohort!!! 
-PET_TAG="PET_PiB"
+PET_TAG="PET"
 # ---------------------------------------------------------------- #
 
 SCRIPTS_DIR="${PROJ_DIR}/Scripts/Validation"
-LIST_DIR="${PROJ_DIR}/Lists/2Validation"
-PROTO_DIR="${PROJ_DIR}/Protocols/2Validation"
+LIST_DIR="${PROJ_DIR}/Lists/3Validation"
+PROTO_DIR="${PROJ_DIR}/Protocols/3Validation"
 DATA_DIR="${PROJ_DIR}/Data/Validation/fullPET_PET"
 
 mkdir -p "${SCRIPTS_DIR}" "${LIST_DIR}" "${PROTO_DIR}"

@@ -2,7 +2,7 @@
 #
 # Step4B_SUVR_WC.sh
 #
-#SBATCH --job-name=DPPOS_Feb26PET_SUVR_WC
+#SBATCH --job-name=DPPOS_Jun26_SUVR_WC
 #SBATCH --partition=all
 #SBATCH --propagate=NONE
 #SBATCH --time=00:20:00
@@ -37,88 +37,89 @@ OUT_DIR="${PROTO_DIR}/Centiloid_Scores_WC"
 PER_SUB_DIR="${OUT_DIR}/per_subject"
 mkdir -p "${PER_SUB_DIR}"
 
-############################################
-# Make sure FSL/fslstats exists (robust)
-############################################
+# ----- deterministic FSL/Lmod setup -----
 
-need_cmd() { command -v "$1" >/dev/null 2>&1 || { echo "ERROR: missing command: $1"; exit 1; }; }
+ORIG_PATH="${PATH:-}"
+export PATH="/usr/local/bin:/usr/bin:/bin${ORIG_PATH:+:${ORIG_PATH}}"
+export LD_LIBRARY_PATH="${LD_LIBRARY_PATH:-}"
+export FSLOUTPUTTYPE="NIFTI_GZ"
 
-ensure_fsl() {
-  # if need_cmd fslstats; then
-  #   return 0
-  # fi
-
-  # If FSLDIR is set, try PATH update + source config
-  if [ -n "${FSLDIR:-}" ]; then
-    export PATH="${FSLDIR}/bin:${PATH}"
-    # shellcheck disable=SC1090
-    if [ -f "${FSLDIR}/etc/fslconf/fsl.sh" ]; then
-      # shellcheck disable=SC1090
-      source "${FSLDIR}/etc/fslconf/fsl.sh" >/dev/null 2>&1 || true
-    fi
-  fi
-  if need_cmd fslstats; then
-    return 0
-  fi
-
-  # Try modules if available (or initialize them if missing)
-  if ! command -v module >/dev/null 2>&1; then
-    if [ -f /usr/share/Modules/init/bash ]; then
-      # shellcheck disable=SC1091
-      source /usr/share/Modules/init/bash >/dev/null 2>&1 || true
-    fi
-  fi
-
-  if command -v module >/dev/null 2>&1; then
-    module load fsl/5.0.11 >/dev/null 2>&1 || true
-  fi
-
-  # If module load set FSLDIR, source config and update PATH
-  if [ -n "${FSLDIR:-}" ]; then
-    export PATH="${FSLDIR}/bin:${PATH}"
-    # shellcheck disable=SC1090
-    if [ -f "${FSLDIR}/etc/fslconf/fsl.sh" ]; then
-      # shellcheck disable=SC1090
-      source "${FSLDIR}/etc/fslconf/fsl.sh" >/dev/null 2>&1 || true
-    fi
-  fi
-
-  # Really annoying to still not have fslstats, so this is hardest fallback
-  if need_cmd fslstats; then
-      return 0
-  else
-      # Fallback to direct binary path
-      FSLSTATS_BIN="/cbica/software/external/fsl/centos7/5.0.11/bin/fslstats"
-
-      if [ -x "$FSLSTATS_BIN" ]; then
-          fslstats() {
-              "$FSLSTATS_BIN" "$@"
-          }
-      else
-          echo "Error: fslstats not found and fallback binary is not executable." >&2
-          return 1
-      fi
-  fi
+need_cmd() {
+    command -v "$1" >/dev/null 2>&1 || {
+        echo "ERROR: missing command: $1" >&2
+        echo "PATH=${PATH}" >&2
+        exit 127
+    }
 }
 
-if ! ensure_fsl; then
-  log "ERROR: fslstats not available after attempts. FSLDIR='${FSLDIR:-}' PATH='${PATH}'"
-  write_fail_csv "missing_fslstats"
-  exit 0
+need_cmd mkdir
+
+OUT_DIR="${PROTO_DIR}/Centiloid_Scores_WC"
+PER_SUB_DIR="${OUT_DIR}/per_subject"
+mkdir -p "${PER_SUB_DIR}"
+
+LMOD_INIT="${LMOD_INIT:-/cubic/software/centos7/lmod/lmod/init/bash}"
+
+if ! command -v module >/dev/null 2>&1; then
+    echo "NOTE: Initializing Lmod from ${LMOD_INIT}"
+    [[ -r "${LMOD_INIT}" ]] || {
+        echo "ERROR: Lmod init file is not readable: ${LMOD_INIT}" >&2
+        exit 127
+    }
+    set +u
+    . "${LMOD_INIT}"
+    set -u
 fi
 
-if ! need_cmd python; then
-  log "ERROR: python not available in PATH='${PATH}'"
-  write_fail_csv "missing_python"
-  exit 0
+export OSrelease="${OSrelease:-centos7}"
+export ARCH="${ARCH:-$(uname -m)}"
+
+module use /cbica/share/modules
+module load fsl/5.0.11
+
+if [[ -z "${FSLDIR:-}" && -d /cbica/software/external/fsl/centos7/5.0.11 ]]; then
+    export FSLDIR="/cbica/software/external/fsl/centos7/5.0.11"
 fi
 
-export FSLOUTPUTTYPE='NIFTI_GZ'
+[[ -n "${FSLDIR:-}" ]] || {
+    echo "ERROR: FSLDIR is not set after loading fsl/5.0.11" >&2
+    exit 127
+}
 
-# -------------------------------------------------------
+if [[ -r "${FSLDIR}/etc/fslconf/fsl.sh" ]]; then
+    set +u
+    . "${FSLDIR}/etc/fslconf/fsl.sh"
+    set -u
+fi
+
+# FSL/module init may rewrite PATH. Restore core tools, keep original SLURM PATH, and put FSL first.
+export PATH="${FSLDIR}/bin:/usr/local/bin:/usr/bin:/bin${ORIG_PATH:+:${ORIG_PATH}}"
+hash -r
 
 need_cmd fslstats
-need_cmd python
+need_cmd fslmaths
+need_cmd mv
+need_cmd rm
+
+echo "PATH               : ${PATH}"
+echo "FSLDIR             : ${FSLDIR}"
+echo "fslstats           : $(command -v fslstats)"
+echo "fslmaths           : $(command -v fslmaths)"
+echo "mv                 : $(command -v mv)"
+
+# ----------------------------------------
+
+read_nth_line() {
+  local n="$1" file="$2" i=0 row
+  while IFS= read -r row || [[ -n "${row}" ]]; do
+    if [[ "${i}" -eq "${n}" ]]; then
+      printf '%s\n' "${row}"
+      return 0
+    fi
+    ((i+=1))
+  done < "${file}"
+  return 1
+}
 
 idx="${SLURM_ARRAY_TASK_ID:-}"
 [ -n "${idx}" ] || { echo "ERROR: SLURM_ARRAY_TASK_ID not set"; exit 1; }
@@ -126,7 +127,13 @@ idx="${SLURM_ARRAY_TASK_ID:-}"
 # Print once per task (useful in logs, very low noise)
 echo "INFO: task=${idx} reading subject row from ${SUBJECT_LIST}"
 
-line="$(sed -n "$((idx + 1))p" "${SUBJECT_LIST}" || true)"
+[[ "${idx}" =~ ^[0-9]+$ ]] || {
+  echo "ERROR: SLURM_ARRAY_TASK_ID is not numeric: ${idx}" >&2
+  exit 1
+}
+
+line="$(read_nth_line "${idx}" "${SUBJECT_LIST}" || true)"
+
 if [ -z "${line}" ]; then
   echo "WARN: No row for task ${idx} (SUBJECT_LIST shorter than expected). Exiting 0."
   exit 0
@@ -148,23 +155,37 @@ is_num() { [[ "${1:-}" =~ ^-?[0-9]+([.][0-9]+)?([eE][-+]?[0-9]+)?$ ]]; }
 safe_mean() {
   local img="$1" msk="$2"
   local out
-  # Keep stderr for debugging if it fails
-  if ! out=$(fslstats "$img" -n -k "$msk" -M 2>&1); then
-    echo "WARN: fslstats failed for img=${img} mask=${msk}"
-    echo "WARN: fslstats stderr/stdout: ${out}"
+
+  if ! out="$(fslstats "$img" -n -k "$msk" -M 2>&1)"; then
+    echo "WARN: fslstats failed for img=${img} mask=${msk}" >&2
+    echo "WARN: fslstats stderr/stdout: ${out}" >&2
     echo "NA"
     return 0
   fi
-  out="$(echo "$out" | awk '{print $1}')"
-  [[ "$out" =~ ^-?[0-9]+([.][0-9]+)?([eE][-+]?[0-9]+)?$ ]] && echo "$out" || echo "NA"
+
+  read -r out _ <<< "${out}"
+  [[ "${out}" =~ ^-?[0-9]+([.][0-9]+)?([eE][-+]?[0-9]+)?$ ]] && echo "${out}" || echo "NA"
 }
 
-calc_suvr () {
-  python - "$1" "$2" <<'PY'
-import sys
-t=float(sys.argv[1]); r=float(sys.argv[2])
-print(f"{t/r:.6f}" if r>0 else "NA")
-PY
+is_pos_nonzero() {
+  local x="${1:-}" mant
+  is_num "${x}" || return 1
+  [[ "${x}" == -* ]] && return 1
+  x="${x#+}"
+  mant="${x%%[eE]*}"
+  mant="${mant//./}"
+  [[ "${mant}" =~ [1-9] ]]
+}
+
+calc_suvr() {
+  local img="$1" ref="$2" mask="$3" tmp_img="$4"
+
+  if ! fslmaths "${img}" -div "${ref}" "${tmp_img}" >/dev/null 2>&1; then
+    echo "NA"
+    return 0
+  fi
+
+  safe_mean "${tmp_img}" "${mask}"
 }
 
 note_out="OK"
@@ -196,11 +217,15 @@ if ! is_num "${mean_ctx}"; then note_out="mean_ctx_failed"; fi
 if ! is_num "${mean_wc}"; then note_out="${note_out};ref_wc_bad"; fi
 
 if [[ "${note_out}" == OK* ]]; then
-  if python - <<PY >/dev/null 2>&1
-r=float("${mean_wc}"); import sys; sys.exit(0 if r>0 else 1)
-PY
-  then
-    suvr_wc="$(calc_suvr "${mean_ctx}" "${mean_wc}")"
+  if is_pos_nonzero "${mean_wc}"; then
+    tmp_suvr_img="${PER_SUB_DIR}/${subLong}_${tracer}_tmp_suvr_wc.nii.gz"
+    suvr_wc="$(calc_suvr "${pet_rMNI}" "${mean_wc}" "${VOI_CTX}" "${tmp_suvr_img}")"
+    rm -f "${tmp_suvr_img}" 2>/dev/null || true
+
+    if ! is_num "${suvr_wc}"; then
+      note_out="suvr_calc_failed"
+      suvr_wc="NA"
+    fi
   else
     note_out="ref_wc_nonpos"
   fi

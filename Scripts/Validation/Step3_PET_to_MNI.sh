@@ -14,7 +14,7 @@
 #SBATCH --partition=all
 #SBATCH --propagate=NONE
 #SBATCH --job-name=PET_MNI
-#SBATCH --output=Logs/2FB_Val_PiB/PET_MNI_%A_%a.log
+#SBATCH --output=Logs/4FB_Val_FBP/PET_MNI_%A_%a.log
 #SBATCH --time=00:45:00
 #SBATCH --cpus-per-task=2
 #SBATCH --mem-per-cpu=2G
@@ -29,7 +29,53 @@ set -euo pipefail
 : "${MNI_TEMPLATE:?MNI_TEMPLATE is not set}"
 : "${SMOOTH_FWHM_MM:=0}"   # default: no smoothing unless wrapper sets it
 
-module load ants/2.3.1 >/dev/null 2>&1 || true
+# ---------------------------------------------------
+# For some reason... module command is not visible...
+if ! command -v module >/dev/null 2>&1; then
+    if [ -f $CUBICLOCAL/lmod/lmod/init/bash ]; then
+      # shellcheck disable=SC1091
+      source $CUBICLOCAL/lmod/lmod/init/bash >/dev/null 2>&1 || true
+    fi
+fi
+
+if command -v module >/dev/null 2>&1; then
+    module use /cbica/share/modules || true
+    module load ants/2.3.1 || true
+fi
+# ---------------------------------------------------
+
+threads="${SLURM_CPUS_PER_TASK:-8}"
+export ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS="${threads}"
+export OMP_NUM_THREADS="${threads}"
+
+REG_ROOT="${PROTO_DIR}/Registration_T1_to_MNI"
+mkdir -p "${REG_ROOT}" "${LIST_DIR}"
+
+# ------- I can't tolerate ANTs not visible to 10% nodes in the same parition! -------
+# --- Minimal ANTs initialization ---
+ANTS_ROOT="/cbica/software/external/ANTs/centos7/2.3.1"
+ANTS_REQUIRED_CMD="antsApplyTransforms"
+
+# Only initialize ANTs if it is not already visible
+if ! command -v "${ANTS_REQUIRED_CMD}" >/dev/null 2>&1; then
+    if [ -x "${ANTS_ROOT}/bin/${ANTS_REQUIRED_CMD}" ]; then
+        export ANTSPATH="${ANTS_ROOT}/bin/"
+        export PATH="${ANTS_ROOT}/bin:${PATH}"
+        export LD_LIBRARY_PATH="${ANTS_ROOT}/lib:${ANTS_ROOT}/ITKv5-install/lib:${LD_LIBRARY_PATH:-}"
+        hash -r
+    else
+        echo "ERROR: ANTs not available. Expected executable not found at:" >&2
+        echo "  ${ANTS_ROOT}/bin/${ANTS_REQUIRED_CMD}" >&2
+        exit 127
+    fi
+fi
+
+# Final sanity check
+if ! command -v "${ANTS_REQUIRED_CMD}" >/dev/null 2>&1; then
+    echo "ERROR: Failed to initialize ANTs; '${ANTS_REQUIRED_CMD}' is still not in PATH." >&2
+    exit 127
+fi
+# --------------------------------------------------------------------------------------
 
 REG_PET_T1_DIR="${PROTO_DIR}/Registration_PET_to_T1"
 REG_T1_MNI_DIR="${PROTO_DIR}/Registration_T1_to_MNI"

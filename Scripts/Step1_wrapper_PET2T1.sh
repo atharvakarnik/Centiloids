@@ -18,8 +18,8 @@ PET_TAG="PET_3D"
 
 PROJ_DIR="${HOME}/Pipelines/Centiloids"
 
-LIST_DIR="${PROJ_DIR}/Lists/2DPPOS_Feb26PET"
-PROTO_DIR="${PROJ_DIR}/Protocols/2DPPOS_Feb26PET"
+LIST_DIR="${PROJ_DIR}/Lists/Jun26"
+PROTO_DIR="${PROJ_DIR}/Protocols/Jun26"
 PREPROC_PET_ROOT="${PROTO_DIR}/PET_Preproc"
 REORIENT_DIR="${PROJ_DIR}/Data/ReOrientedLPS"
 SCRIPTS_DIR="${PROJ_DIR}/Scripts"
@@ -138,7 +138,7 @@ ARRAY_RANGE="0-$((n - 1))"
 echo "Submitting SLURM array job for ${ARRAY_RANGE}..."
 
 sbatch \
-    --export=PROJ_DIR="${PROJ_DIR}",PROTO_DIR="${PROTO_DIR}",REORIENT_DIR="${REORIENT_DIR}",LIST_DIR="${LIST_DIR}",SUBJECT_LIST="${SUBJECT_LIST}",S0B_CSV="${S0B_CSV}",PET_TAG="${PET_TAG}",FSLOUTPUTTYPE='NIFTI_GZ' \
+    --export=PROJ_DIR="${PROJ_DIR}",PROTO_DIR="${PROTO_DIR}",REORIENT_DIR="${REORIENT_DIR}",LIST_DIR="${LIST_DIR}",SUBJECT_LIST="${SUBJECT_LIST}",,S0B_CSV="${S0B_CSV}",PET_TAG="${PET_TAG}",FSLOUTPUTTYPE="NIFTI_GZ",LMOD_INIT="/cubic/software/centos7/lmod/lmod/init/bash",OSrelease="${OSrelease:-centos7}" \
     --array="${ARRAY_RANGE}" "${SCRIPTS_DIR}/Step1_PET2T1.sh"
 
 echo "Submitted!"

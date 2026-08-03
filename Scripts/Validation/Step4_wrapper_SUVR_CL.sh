@@ -14,8 +14,8 @@
 set -euo pipefail
 
 PROJ_DIR="${HOME}/Pipelines/Centiloids"
-LIST_DIR="${PROJ_DIR}/Lists/2Validation"
-PROTO_DIR="${PROJ_DIR}/Protocols/2Validation"
+LIST_DIR="${PROJ_DIR}/Lists/4Validation"
+PROTO_DIR="${PROJ_DIR}/Protocols/4Validation"
 ATLAS_DIR="${PROJ_DIR}/Data/Atlases"
 SCRIPTS_DIR="${PROJ_DIR}/Scripts/Validation"
 
@@ -140,7 +140,7 @@ rm -fv "${PROJ_DIR}/Logs/Validation/VAL_S4_finalize.log"
 echo "Submitting finalize job (afterok:${suvr_jobid})"
 sbatch \
   --job-name=VAL_S4_finalize \
-  --output=Logs/2Validation/VAL_S4_finalize.log \
+  --output=Logs/4Validation/VAL_S4_finalize.log \
   --dependency=afterok:"${suvr_jobid}" \
   --time=00:10:00 --mem=2G --cpus-per-task=1 \
   --export=PER_SUB_DIR="${PER_SUB_DIR}",STATUS_CSV="${STATUS_CSV}",GROUP_CSV="${GROUP_CSV}",AB_CSV="${AB_CSV}" \

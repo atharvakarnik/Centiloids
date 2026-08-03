@@ -11,7 +11,7 @@
 #SBATCH --job-name=Centiloid_SUVR
 #SBATCH --partition=all
 #SBATCH --propagate=NONE
-#SBATCH --output=Logs/2Validation/SUVR_CL_%A_%a.log
+#SBATCH --output=Logs/4Validation/SUVR_CL_%A_%a.log
 #SBATCH --time=00:12:00
 #SBATCH --cpus-per-task=1
 #SBATCH --mem=2G
@@ -56,7 +56,10 @@ tmp="${out_csv}.tmp"
 
 # Why do some cluster nodes don't even have 'module' command visible ??!
 if ! command -v module >/dev/null 2>&1; then
-  source /usr/share/Modules/init/bash 2>/dev/null || true
+    if [ -f $CUBICLOCAL/lmod/lmod/init/bash ]; then
+      # shellcheck disable=SC1091
+      source $CUBICLOCAL/lmod/lmod/init/bash >/dev/null 2>&1 || true
+    fi
 fi
 
 module load python/3.11 >/dev/null 2>&1 || {

@@ -38,4 +38,8 @@ Protocols/
 SPM_based/
 VisualizeIDs.sh
 
+# Soo-Jong's PET-only pipeline
+PETonly_SooJong/
+PyAmyloid/
+
 GitNotes.md

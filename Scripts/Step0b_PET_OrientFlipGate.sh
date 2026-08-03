@@ -1,9 +1,9 @@
-#!/bin/sh
+#!/usr/bin/env bash
 # Step0b_PET_OrientFlipGate.sh
 #SBATCH --job-name=PET_OrientGate
 #SBATCH --partition=all
 #SBATCH --propagate=NONE
-#SBATCH --output=Logs/2DPPOS_Feb26PET/PET_OrientGate_%A_%a.log
+#SBATCH --output=Logs/Jun26/PET_OrientGate_%A_%a.log
 #SBATCH --time=00:20:00
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=4G

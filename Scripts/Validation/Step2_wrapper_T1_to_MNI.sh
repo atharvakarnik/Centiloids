@@ -14,8 +14,8 @@ set -euo pipefail
 
 PROJ_DIR="${HOME}/Pipelines/Centiloids"
 
-LIST_DIR="${PROJ_DIR}/Lists/2FB_Val_FBP"
-PROTO_DIR="${PROJ_DIR}/Protocols/2FB_Val_FBP"
+LIST_DIR="${PROJ_DIR}/Lists/4FB_Val_FBP"
+PROTO_DIR="${PROJ_DIR}/Protocols/4FB_Val_FBP"
 REORIENT_DIR="${PROJ_DIR}/Data/Validation_FBP/ReOrientedLPS"
 DLICV_DIR="${PROJ_DIR}/Data/DLICV"      # No mask used for validation datatset, though it's safe to keep as-is here
 ATLAS_DIR="${PROJ_DIR}/Data/Atlases"
@@ -25,7 +25,7 @@ mkdir -p "${LIST_DIR}" "${PROTO_DIR}"
 
 # MNI Template
 # MNI_TEMPLATE="${ATLAS_DIR}/MNI152_T1_1mm.nii.gz"      # Good choice overall, but have to use SPM-provided for GAAIN-validation
-MNI_TEMPLATE="${ATLAS_DIR}/avg152T1.nii.gz"
+MNI_TEMPLATE="${ATLAS_DIR}/MNI152_T1_2mm.nii.gz"        # Replaced avg152T1 for Git Issue #1
 
 
 # ----------------------------
@@ -135,7 +135,7 @@ ARRAY_RANGE="0-$((n - 1))"
 echo "Submitting SLURM array job for ${ARRAY_RANGE}..."
 
 sbatch \
-    --export=PROJ_DIR="${PROJ_DIR}",PROTO_DIR="${PROTO_DIR}",REORIENT_DIR="${REORIENT_DIR}",DLICV_DIR="${DLICV_DIR}",ATLAS_DIR="${ATLAS_DIR}",LIST_DIR="${LIST_DIR}",SUBJECT_LIST="${SUBJECT_LIST}",MNI_TEMPLATE="${MNI_TEMPLATE}",FSLOUTPUTTYPE='NIFTI_GZ',T1_MNI_MODE="${T1_MNI_MODE}" \
+    --export=PROJ_DIR="${PROJ_DIR}",PROTO_DIR="${PROTO_DIR}",REORIENT_DIR="${REORIENT_DIR}",DLICV_DIR="${DLICV_DIR}",ATLAS_DIR="${ATLAS_DIR}",LIST_DIR="${LIST_DIR}",PATH="${PATH}",SUBJECT_LIST="${SUBJECT_LIST}",MNI_TEMPLATE="${MNI_TEMPLATE}",FSLOUTPUTTYPE='NIFTI_GZ',T1_MNI_MODE="${T1_MNI_MODE}" \
     --array="${ARRAY_RANGE}" "${SCRIPTS_DIR}/Step2_T1_to_MNI.sh"
 
 echo "Submitted!"

@@ -3,12 +3,12 @@
 set -euo pipefail
 
 # IMPORTANT : Check this var meticulously to state correct cohort!!! 
-PET_TAG="PET_PiB"
+PET_TAG="PET"
 # ---------------------------------------------------------------- #
 
 PROJ_DIR="${HOME}/Pipelines/Centiloids"
-LIST_DIR="${PROJ_DIR}/Lists/2Validation"
-PROTO_DIR="${PROJ_DIR}/Protocols/2Validation"
+LIST_DIR="${PROJ_DIR}/Lists/3Validation"
+PROTO_DIR="${PROJ_DIR}/Protocols/3Validation"
 REORIENT_DIR="${PROJ_DIR}/Data/Validation/ReOrientedLPS"
 SCRIPTS_DIR="${PROJ_DIR}/Scripts/Validation"
 
