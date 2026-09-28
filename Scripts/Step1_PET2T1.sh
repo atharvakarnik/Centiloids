@@ -20,7 +20,7 @@
 #   bash Step1_wrapper_PET2T1.sh
 #
 #SBATCH --job-name=PET2T1
-#SBATCH --output=Logs/Jun26/PET2T1_%A_%a.log
+#SBATCH --output=Logs/Aug26/PET2T1_%A_%a.log
 #SBATCH --time=3:00:00
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=16G

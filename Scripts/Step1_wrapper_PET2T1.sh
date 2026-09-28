@@ -18,8 +18,8 @@ PET_TAG="PET_3D"
 
 PROJ_DIR="${HOME}/Pipelines/Centiloids"
 
-LIST_DIR="${PROJ_DIR}/Lists/Jun26"
-PROTO_DIR="${PROJ_DIR}/Protocols/Jun26"
+LIST_DIR="${PROJ_DIR}/Lists/Aug26"
+PROTO_DIR="${PROJ_DIR}/Protocols/Aug26"
 PREPROC_PET_ROOT="${PROTO_DIR}/PET_Preproc"
 REORIENT_DIR="${PROJ_DIR}/Data/ReOrientedLPS"
 T1_PREPROC_ROOT="${PROTO_DIR}/T1_Preproc"

@@ -1,0 +1,3 @@
+SITE,SUB,SUBLONG,T1,MNI_TEMPLATE,MASK_USED,NOTE
+Medstar,152081,152081_20260608,/cbica/projects/DPPOS/Pipelines/Centiloids/Protocols/Aug26/T1_Preproc/152081_20260608/152081_20260608_T1_N4.nii.gz,/cbica/projects/DPPOS/Pipelines/Centiloids/Data/Atlases/MNI152_T1_2mm.nii.gz,dlicv_mask_n4_preprocessed,ok_Syn
+Chicago,022065,022065_20240716,/cbica/projects/DPPOS/Pipelines/Centiloids/Protocols/Aug26/T1_Preproc/022065_20240716/022065_20240716_T1_N4.nii.gz,/cbica/projects/DPPOS/Pipelines/Centiloids/Data/Atlases/MNI152_T1_2mm.nii.gz,dlicv_mask_n4_preprocessed,ok_Syn
