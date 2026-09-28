@@ -25,6 +25,14 @@ REORIENT_DIR="${PROJ_DIR}/Data/ReOrientedLPS"
 T1_PREPROC_ROOT="${PROTO_DIR}/T1_Preproc"
 SCRIPTS_DIR="${PROJ_DIR}/Scripts"
 
+# Keep the cluster toolchain explicit when the job is launched. The worker
+# resolves the loaded GCC module's libstdc++.so.6 path on each compute node.
+MODULE_ROOT="/cbica/share/modules"
+FSL_MODULE="fsl/5.0.11"
+GCC_MODULE="gcc/5.2.0"
+ANTS_MODULE="ants/2.3.1"
+ANTS_ROOT="/cbica/software/external/ants/centos7/2.3.1"
+
 mkdir -p "${LIST_DIR}" "${PROTO_DIR}"
 
 # Stage-1 list files (CSV with s1_ prefix)
@@ -39,6 +47,7 @@ echo "REORIENT_DIR   : ${REORIENT_DIR}"
 echo "T1_PREPROC_ROOT: ${T1_PREPROC_ROOT}"
 echo "LIST_DIR       : ${LIST_DIR}"
 echo "SUBJECT_LIST   : ${SUBJECT_LIST}"
+echo "ANTS_ROOT      : ${ANTS_ROOT}"
 echo "==============================================="
 echo
 
@@ -146,7 +155,7 @@ ARRAY_RANGE="0-$((n - 1))"
 echo "Submitting SLURM array job for ${ARRAY_RANGE}..."
 
 sbatch \
-    --export=PROJ_DIR="${PROJ_DIR}",PROTO_DIR="${PROTO_DIR}",LIST_DIR="${LIST_DIR}",SUBJECT_LIST="${SUBJECT_LIST}",PET_TAG="${PET_TAG}",FSLOUTPUTTYPE="NIFTI_GZ",LMOD_INIT="/cubic/software/centos7/lmod/lmod/init/bash",OSrelease="${OSrelease:-centos7}" \
+    --export=PROJ_DIR="${PROJ_DIR}",PROTO_DIR="${PROTO_DIR}",LIST_DIR="${LIST_DIR}",SUBJECT_LIST="${SUBJECT_LIST}",PET_TAG="${PET_TAG}",FSLOUTPUTTYPE="NIFTI_GZ",LMOD_INIT="/cubic/software/centos7/lmod/lmod/init/bash",OSrelease="${OSrelease:-centos7}",MODULE_ROOT="${MODULE_ROOT}",FSL_MODULE="${FSL_MODULE}",GCC_MODULE="${GCC_MODULE}",ANTS_MODULE="${ANTS_MODULE}",ANTS_ROOT="${ANTS_ROOT}" \
     --array="${ARRAY_RANGE}" "${SCRIPTS_DIR}/Step1_PET2T1.sh"
 
 echo "Submitted!"
