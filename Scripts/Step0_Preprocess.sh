@@ -53,7 +53,6 @@ fi
 
 MCRMMBA_EXE="${HOME}/.local/bin/micromamba"
 export MAMBA_ROOT_PREFIX="${HOME}/micromamba"
-export FSLOUTPUTTYPE='NIFTI_GZ'
 
 eval "$(${MCRMMBA_EXE} shell hook --shell bash)"
 micromamba activate HypoThal_QC
@@ -63,6 +62,10 @@ module use /cbica/share/modules
 module load fsl/5.0.11
 module load gcc/5.2.0
 module load ants/2.3.1
+
+# FSL/module initialization can overwrite this setting. Export it only after
+# all environment and module setup so extensionless FSL outputs are NIfTI-GZ.
+export FSLOUTPUTTYPE='NIFTI_GZ'
 
 ##############################
 # Environment sanity checks  #
@@ -122,6 +125,7 @@ echo "DATA_DIR : ${DATA_DIR}"
 echo "REORIENT_DIR: ${REORIENT_DIR}"
 echo "DLICV_DIR: ${DLICV_DIR}"
 echo "PET_TAG  : ${PET_TAG}"
+echo "FSLOUTPUTTYPE: ${FSLOUTPUTTYPE}"
 echo "OUT_ROOT : ${OUT_ROOT}"
 echo "LIST_DIR : ${LIST_DIR}"
 echo "SUBJECT_LIST: ${SUBJECT_LIST}"
@@ -333,7 +337,7 @@ process_subject() {
 
     # Motion correct
     # Note: -report can be noisy; keep as your preference
-    if ! mcflirt -in "${input_nii}" -out "${out_4d_root}" -plots -report; then
+    if ! FSLOUTPUTTYPE=NIFTI_GZ mcflirt -in "${input_nii}" -out "${out_4d_root}" -plots -report; then
         echo "  !! mcflirt failed for ${site}/${sub}"
         echo "${site},${sub},mcflirt_failed" >> "${MISSING_CSV}"
         return
@@ -341,12 +345,17 @@ process_subject() {
 
     if [ ! -f "${out_4d}" ]; then
         echo "  !! mcflirt output missing: ${out_4d}"
-        echo "${site},${sub},mcflirt_output_missing" >> "${MISSING_CSV}"
+        if [ -f "${out_4d_root}.hdr" ] || [ -f "${out_4d_root}.img" ]; then
+            echo "  !! mcflirt unexpectedly produced ANALYZE output despite FSLOUTPUTTYPE=${FSLOUTPUTTYPE}"
+            echo "${site},${sub},mcflirt_unexpected_ANALYZE_output" >> "${MISSING_CSV}"
+        else
+            echo "${site},${sub},mcflirt_output_missing" >> "${MISSING_CSV}"
+        fi
         return
     fi
 
     # Mean over time dimension to produce downstream canonical 3D
-    if ! fslmaths "${out_4d}" -Tmean "${out_3d}"; then
+    if ! FSLOUTPUTTYPE=NIFTI_GZ fslmaths "${out_4d}" -Tmean "${out_3d}"; then
         echo "  !! fslmaths -Tmean failed for ${site}/${sub}"
         echo "${site},${sub},Tmean_failed" >> "${MISSING_CSV}"
         return
