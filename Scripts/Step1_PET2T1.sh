@@ -65,10 +65,15 @@ fi
 export OSrelease="${OSrelease:-centos7}"
 export ARCH="${ARCH:-$(uname -m)}"
 
-module use /cbica/share/modules
-module load fsl/5.0.11
-module load gcc/5.2.0
-module load ants/2.3.1
+MODULE_ROOT="${MODULE_ROOT:-/cbica/share/modules}"
+FSL_MODULE="${FSL_MODULE:-fsl/5.0.11}"
+GCC_MODULE="${GCC_MODULE:-gcc/5.2.0}"
+ANTS_MODULE="${ANTS_MODULE:-ants/2.3.1}"
+
+module use "${MODULE_ROOT}"
+module load "${FSL_MODULE}"
+module load "${GCC_MODULE}"
+module load "${ANTS_MODULE}"
 
 export OMP_NUM_THREADS="${SLURM_CPUS_PER_TASK:-1}"
 export ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS="${SLURM_CPUS_PER_TASK:-1}"
@@ -93,31 +98,76 @@ echo "ulimit -St after : $(ulimit -St)"
 echo "ulimit -Ht after : $(ulimit -Ht)"
 # ---------------------------------------------------
 
-# ------- I can't tolerate ANTs not visible to 10% nodes in the same parition! -------
+# ------- Pin ANTs and its GCC runtime on every compute node -------
 ANTS_ROOT="${ANTS_ROOT:-/cbica/software/external/ants/centos7/2.3.1}"
-ANTS_REQUIRED_CMD="antsRegistration"
+ANTS_REGISTRATION="${ANTS_ROOT}/bin/antsRegistration"
+ANTS_APPLY_TRANSFORMS="${ANTS_ROOT}/bin/antsApplyTransforms"
 
-[[ -x "${ANTS_ROOT}/bin/${ANTS_REQUIRED_CMD}" ]] || {
-    echo "ERROR: Expected ANTs executable not found: ${ANTS_ROOT}/bin/${ANTS_REQUIRED_CMD}" >&2
-    exit 127
-}
+for ants_exe in "${ANTS_REGISTRATION}" "${ANTS_APPLY_TRANSFORMS}"; do
+    [[ -x "${ants_exe}" ]] || {
+        echo "ERROR: Expected ANTs executable not found: ${ants_exe}" >&2
+        exit 127
+    }
+done
 
 export ANTSPATH="${ANTS_ROOT}/bin/"
 prepend_path PATH "${ANTS_ROOT}/bin"
 prepend_path LD_LIBRARY_PATH "${ANTS_ROOT}/lib"
 prepend_path LD_LIBRARY_PATH "${ANTS_ROOT}/ITKv5-install/lib"
+
+# Resolve libstdc++ from the explicitly loaded GCC module. Prepending this
+# directory prevents a compute node's older /lib64 copy from winning.
+GCC_EXE="$(command -v gcc || true)"
+if [[ -z "${GCC_EXE}" ]]; then
+    echo "ERROR: gcc is unavailable after loading ${GCC_MODULE}" >&2
+    exit 127
+fi
+
+GCC_LIBSTDCPP="${GCC_LIBSTDCPP:-$("${GCC_EXE}" -print-file-name=libstdc++.so.6 2>/dev/null || true)}"
+if [[ "${GCC_LIBSTDCPP}" != /* || ! -r "${GCC_LIBSTDCPP}" ]]; then
+    echo "ERROR: ${GCC_MODULE} did not resolve a readable libstdc++.so.6: ${GCC_LIBSTDCPP:-not_found}" >&2
+    exit 126
+fi
+GCC_LIB_DIR="$(dirname "${GCC_LIBSTDCPP}")"
+prepend_path LD_LIBRARY_PATH "${GCC_LIB_DIR}"
 hash -r
 
-ANTS_EXE="$(command -v "${ANTS_REQUIRED_CMD}")"
-libstdcpp="$(ldd "${ANTS_EXE}" 2>/dev/null | awk '/libstdc\+\+/{print $3; exit}' || true)"
+echo "MODULE_ROOT        : ${MODULE_ROOT}"
+echo "FSL_MODULE         : ${FSL_MODULE}"
+echo "GCC_MODULE         : ${GCC_MODULE}"
+echo "ANTS_MODULE        : ${ANTS_MODULE}"
+echo "ANTS_REGISTRATION  : ${ANTS_REGISTRATION}"
+echo "ANTS_APPLY_XFORMS  : ${ANTS_APPLY_TRANSFORMS}"
+echo "ANTSPATH           : ${ANTSPATH}"
+echo "GCC_EXE            : ${GCC_EXE}"
+echo "GCC libstdc++      : ${GCC_LIBSTDCPP}"
+echo "LD_LIBRARY_PATH    : ${LD_LIBRARY_PATH}"
 
-echo "ANTS_EXE           : ${ANTS_EXE}"
-echo "libstdc++          : ${libstdcpp:-not_found}"
+if command -v ldd >/dev/null 2>&1 && command -v grep >/dev/null 2>&1; then
+    ldd_output="$(ldd "${ANTS_REGISTRATION}" 2>&1 || true)"
+    libstdcpp="$(awk '/libstdc\+\+/{
+        if ($2 == "=>" && $3 ~ /^\//) { print $3; exit }
+        if ($1 ~ /^\//) { print $1; exit }
+    }' <<< "${ldd_output}")"
+    echo "ANTs libstdc++     : ${libstdcpp:-not_found}"
 
-[[ -n "${libstdcpp:-}" && "${libstdcpp}" != /lib64/* ]] || {
-    echo "ERROR: ANTs is using old or unresolved libstdc++: ${libstdcpp:-not_found}" >&2
-    exit 126
-}
+    if [[ -z "${libstdcpp}" || ! -r "${libstdcpp}" ]]; then
+        echo "ERROR: Could not resolve libstdc++.so.6 for ${ANTS_REGISTRATION}" >&2
+        echo "ldd output:" >&2
+        echo "${ldd_output}" >&2
+        exit 126
+    fi
+
+    if [[ "${libstdcpp}" == /lib64/* ]]; then
+        echo "ERROR: ANTs is using old system libstdc++: ${libstdcpp}" >&2
+        exit 126
+    fi
+
+    if ! grep -a -q 'GLIBCXX_3\.4\.20' "${libstdcpp}"; then
+        echo "ERROR: ${libstdcpp} lacks GLIBCXX_3.4.20" >&2
+        exit 126
+    fi
+fi
 
 # --------------------------------------------------------------------------------------
 
@@ -194,7 +244,7 @@ if [ -f "${out_pet_rT1}" ] && [ -f "${out_mat}" ]; then
     exit 0
 fi
 
-for cmd in fslstats fslmaths fslval fslroi cluster antsRegistration antsApplyTransforms; do
+for cmd in fslstats fslmaths fslval fslroi cluster; do
     command -v "${cmd}" >/dev/null 2>&1 || {
         echo "ERROR: Required command not found: ${cmd}" >&2
         echo "${site},${sub},${subLong},missing_command_${cmd}" >> "${MISSING_CSV}"
@@ -280,7 +330,7 @@ if [ ! -f "${out_mat}" ]; then
 
     echo "  -> Estimating rigid PET -> T1 transform..."
     prefix="${pet2t1_workdir}/${subLong}_PET2T1_"
-    if ! antsRegistration -d 3 \
+    if ! "${ANTS_REGISTRATION}" -d 3 \
       -o ["${prefix}","${prefix}Warped.nii.gz"] \
       --float 1 \
       --winsorize-image-intensities [0.005,0.995] \
@@ -306,7 +356,7 @@ if [ ! -f "${out_mat}" ]; then
 fi
 
 echo "  -> Applying rigid transform to original canonical PET for QC..."
-if ! antsApplyTransforms -d 3 \
+if ! "${ANTS_APPLY_TRANSFORMS}" -d 3 \
     -i "${pet_og}" \
     -r "${t1_n4_brain}" \
     -n Linear \
