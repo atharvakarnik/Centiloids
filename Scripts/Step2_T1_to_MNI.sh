@@ -20,8 +20,6 @@ set -euo pipefail
 
 : "${PROJ_DIR:?PROJ_DIR is not set}"
 : "${PROTO_DIR:?PROTO_DIR is not set}"
-: "${REORIENT_DIR:?REORIENT_DIR is not set}"
-: "${DLICV_DIR:?DLICV_DIR is not set}"
 : "${ATLAS_DIR:?ATLAS_DIR is not set}"
 : "${LIST_DIR:?LIST_DIR is not set}"
 : "${SUBJECT_LIST:?SUBJECT_LIST is not set}"
@@ -63,13 +61,11 @@ export OSrelease="${OSrelease:-centos7}"
 export ARCH="${ARCH:-$(uname -m)}"
 
 module use /cbica/share/modules
-module load fsl/5.0.11
 module load gcc/5.2.0
 module load ants/2.3.1
 
 threads="${SLURM_CPUS_PER_TASK:-8}"
 export ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS="${threads}"
-export FSLOUTPUTTYPE="NIFTI_GZ"
 
 # ------- I can't tolerate ANTs not visible to 10% nodes in the same parition! -------
 ANTS_ROOT="${ANTS_ROOT:-/cbica/software/external/ants/centos7/2.3.1}"
@@ -145,41 +141,13 @@ site=$(echo "${map_line}" | awk '{print $1}')
 sub=$(echo "${map_line}" | awk '{print $2}')
 subLong=$(echo "${map_line}" | awk '{print $3}')
 
-t1_raw="${REORIENT_DIR}/${subLong}/${subLong}_T1_LPS.nii.gz"
-mask="${DLICV_DIR}/${subLong}/${subLong}_T1_LPS_dlicvmask.nii.gz"
 t1_preproc_dir="${PROTO_DIR}/T1_Preproc/${subLong}"
 t1="${t1_preproc_dir}/${subLong}_T1_N4.nii.gz"
-t1_n4_brain="${t1_preproc_dir}/${subLong}_T1_N4_brain.nii.gz"
-t1_preproc_helper="${PROJ_DIR}/Scripts/T1_preprocess_N4.sh"
 
-if [ ! -f "${t1_raw}" ]; then
-    echo "  !! Missing T1 for ${subLong}: ${t1_raw}"
-    echo "${site},${sub},${subLong},missing_T1" >> "${MISS_CSV}"
-    exit 1
-fi
-
-if [ ! -f "${mask}" ]; then
-    echo "  !! Missing required DLICV mask for ${subLong}: ${mask}"
-    echo "${site},${sub},${subLong},missing_DLICV_mask" >> "${MISS_CSV}"
-    exit 1
-fi
-
-if [ ! -f "${t1_preproc_helper}" ]; then
-    echo "  !! Missing T1 preprocessing helper: ${t1_preproc_helper}"
-    echo "${site},${sub},${subLong},missing_T1_preprocess_helper" >> "${MISS_CSV}"
-    exit 1
-fi
-
-if ! bash "${t1_preproc_helper}" "${t1_raw}" "${mask}" "${PROTO_DIR}" "${subLong}"; then
-    echo "  !! Shared T1 preprocessing failed for ${subLong}."
-    echo "${site},${sub},${subLong},T1_preprocess_failed" >> "${MISS_CSV}"
-    exit 1
-fi
-
-if [ ! -f "${t1}" ] || [ ! -f "${t1_n4_brain}" ]; then
-    echo "  !! Shared T1 preprocessing outputs missing for ${subLong}."
-    echo "${site},${sub},${subLong},T1_preprocess_outputs_missing" >> "${MISS_CSV}"
-    exit 1
+if [ ! -f "${t1}" ]; then
+    echo "  !! Step-0 T1_N4 missing for ${subLong}: ${t1}"
+    echo "${site},${sub},${subLong},missing_T1_N4" >> "${MISS_CSV}"
+    exit 0
 fi
 
 out_dir="${REG_ROOT}/${subLong}"
@@ -197,7 +165,7 @@ echo "T1_N4  : ${t1}"
 echo "OutDir : ${out_dir}"
 echo
 
-mask_used="dlicv_mask_n4"
+mask_used="dlicv_mask_n4_preprocessed"
 
 if [ "${T1_MNI_MODE}" = "Syn" ]; then
     echo " -> Using antsRegistrationSyN.sh (baseline)"

@@ -10,8 +10,7 @@
 #
 # Input:
 #   - PET from Step 0: ${PROTO_DIR}/PET_Preproc/${site}/${sub}/${sub}_${PET_TAG}.nii.gz
-#   - T1 (LPS):  ${REORIENT_DIR}/${subLong}/${subLong}_T1_LPS.nii.gz
-#   - DLICV mask: ${DLICV_DIR}/${subLong}/${subLong}_T1_LPS_dlicvmask.nii.gz
+#   - T1 from Step 0: ${PROTO_DIR}/T1_Preproc/${subLong}/${subLong}_T1_N4_brain.nii.gz
 #
 # Output (no site folder):
 #   - ${PROTO_DIR}/Registration_PET_to_T1/${subLong}/${subLong}_PET_rT1.nii.gz
@@ -31,8 +30,6 @@ trap 'echo "ERROR: line ${LINENO}: ${BASH_COMMAND}" >&2' ERR
 
 : "${PROJ_DIR:?PROJ_DIR is not set}"
 : "${PROTO_DIR:?PROTO_DIR is not set}"
-: "${REORIENT_DIR:?REORIENT_DIR is not set}"
-: "${DLICV_DIR:?DLICV_DIR is not set}"
 : "${LIST_DIR:?LIST_DIR is not set}"
 : "${SUBJECT_LIST:?SUBJECT_LIST is not set}"
 : "${PET_TAG:?PET_TAG is not set}"
@@ -139,8 +136,6 @@ fi
 echo "=== Step1: PET->T1 registration (array task) ==="
 echo "PROJ_DIR           : ${PROJ_DIR}"
 echo "PROTO_DIR          : ${PROTO_DIR}"
-echo "REORIENT_DIR       : ${REORIENT_DIR}"
-echo "DLICV_DIR          : ${DLICV_DIR}"
 echo "REG_ROOT           : ${REG_ROOT}"
 echo "SUBJECT_LIST (csv) : ${SUBJECT_LIST}"
 echo "SLURM_ARRAY_TASK_ID: ${SLURM_ARRAY_TASK_ID:-not_set}"
@@ -172,12 +167,8 @@ subLong=$(echo "${line}" | awk '{print $3}')
 echo "Array task ${idx} -> SITE=${site}, SUB=${sub}, SUBLONG=${subLong}"
 
 pet_og="${PROTO_DIR}/PET_Preproc/${site}/${sub}/${sub}_${PET_TAG}.nii.gz"
-t1_raw="${REORIENT_DIR}/${subLong}/${subLong}_T1_LPS.nii.gz"
-dlicv_mask="${DLICV_DIR}/${subLong}/${subLong}_T1_LPS_dlicvmask.nii.gz"
 t1_preproc_dir="${PROTO_DIR}/T1_Preproc/${subLong}"
-t1_n4="${t1_preproc_dir}/${subLong}_T1_N4.nii.gz"
 t1_n4_brain="${t1_preproc_dir}/${subLong}_T1_N4_brain.nii.gz"
-t1_preproc_helper="${PROJ_DIR}/Scripts/T1_preprocess_N4.sh"
 
 if [ ! -f "${pet_og}" ]; then
     echo "  [${site}/${sub}/${subLong}] Step 0 PET not found: ${pet_og}"
@@ -185,34 +176,10 @@ if [ ! -f "${pet_og}" ]; then
     exit 0
 fi
 
-if [ ! -f "${t1_raw}" ]; then
-    echo "  [${site}/${sub}/${subLong}] T1 not found: ${t1_raw}"
-    echo "${site},${sub},${subLong},no_T1_file" >> "${MISSING_CSV}"
+if [ ! -f "${t1_n4_brain}" ]; then
+    echo "  [${site}/${sub}/${subLong}] Step-0 T1_N4_brain not found: ${t1_n4_brain}"
+    echo "${site},${sub},${subLong},no_T1_N4_brain" >> "${MISSING_CSV}"
     exit 0
-fi
-
-if [ ! -f "${dlicv_mask}" ]; then
-    echo "  [${site}/${sub}/${subLong}] Required DLICV mask not found: ${dlicv_mask}"
-    echo "${site},${sub},${subLong},no_DLICV_mask" >> "${MISSING_CSV}"
-    exit 0
-fi
-
-if [ ! -f "${t1_preproc_helper}" ]; then
-    echo "  [${site}/${sub}/${subLong}] T1 preprocessing helper not found: ${t1_preproc_helper}"
-    echo "${site},${sub},${subLong},no_T1_preprocess_helper" >> "${MISSING_CSV}"
-    exit 1
-fi
-
-if ! bash "${t1_preproc_helper}" "${t1_raw}" "${dlicv_mask}" "${PROTO_DIR}" "${subLong}"; then
-    echo "  [${site}/${sub}/${subLong}] Shared T1 preprocessing failed."
-    echo "${site},${sub},${subLong},T1_preprocess_failed" >> "${MISSING_CSV}"
-    exit 1
-fi
-
-if [ ! -f "${t1_n4}" ] || [ ! -f "${t1_n4_brain}" ]; then
-    echo "  [${site}/${sub}/${subLong}] Shared T1 preprocessing outputs are missing."
-    echo "${site},${sub},${subLong},T1_preprocess_outputs_missing" >> "${MISSING_CSV}"
-    exit 1
 fi
 
 out_dir="${REG_ROOT}/${subLong}"

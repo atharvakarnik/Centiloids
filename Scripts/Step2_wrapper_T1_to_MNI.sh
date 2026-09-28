@@ -16,8 +16,7 @@ PROJ_DIR="${HOME}/Pipelines/Centiloids"
 
 LIST_DIR="${PROJ_DIR}/Lists/Jun26"
 PROTO_DIR="${PROJ_DIR}/Protocols/Jun26"
-REORIENT_DIR="${PROJ_DIR}/Data/ReOrientedLPS"
-DLICV_DIR="${HOME}/Pipelines/DPPOS_DLICV_2022/Protocols/DLICV"
+T1_PREPROC_ROOT="${PROTO_DIR}/T1_Preproc"
 ATLAS_DIR="${PROJ_DIR}/Data/Atlases"
 SCRIPTS_DIR="${PROJ_DIR}/Scripts"
 
@@ -46,8 +45,7 @@ SELECTION_T1_CSV="${LIST_DIR}/s2_t1mni_selection_T1.csv"
 
 echo "=== Step2: Wrapper for T1->MNI registration ==="
 echo "PROJ_DIR       : ${PROJ_DIR}"
-echo "REORIENT_DIR   : ${REORIENT_DIR}"
-echo "DLICV_DIR      : ${DLICV_DIR}"
+echo "T1_PREPROC_ROOT: ${T1_PREPROC_ROOT}"
 echo "ATLAS_DIR      : ${ATLAS_DIR}"
 echo "MNI_TEMPLATE   : ${MNI_TEMPLATE}"
 echo "T1_MNI_MODE    : ${T1_MNI_MODE}"
@@ -60,11 +58,6 @@ echo
 if [ ! -f "${MNI_TEMPLATE}" ]; then
     echo "ERROR: MNI template not found:"
     echo "  ${MNI_TEMPLATE}"
-    exit 1
-fi
-
-if [ ! -d "${DLICV_DIR}" ]; then
-    echo "ERROR: DLICV_DIR does not exist: ${DLICV_DIR}"
     exit 1
 fi
 
@@ -83,22 +76,16 @@ echo "SITE,SUB,SUBLONG,REASON" > "${MISSING_T1_CSV}"
 echo "SITE,SUB,SUBLONG,MASK_NOTE" > "${SELECTION_T1_CSV}"
 
 # Parse Step1 selection list (CSV: site,sub,subLong,...)
-# Keep only unique site/sub/subLong and check T1 exists.
+# Keep only unique site/sub/subLong and check the Step-0 T1_N4 exists.
 tail -n +2 "${S1_SELECTION}" | awk -F',' '{print $1,$2,$3}' | sort -u | while read -r site sub subLong; do
-    t1="${REORIENT_DIR}/${subLong}/${subLong}_T1_LPS.nii.gz"
-    if [ ! -f "${t1}" ]; then
-        echo "  !! Missing T1 for ${subLong}"
-        echo "${site},${sub},${subLong},no_T1_file" >> "${MISSING_T1_CSV}"
+    t1_n4="${T1_PREPROC_ROOT}/${subLong}/${subLong}_T1_N4.nii.gz"
+    if [ ! -f "${t1_n4}" ]; then
+        echo "  !! Missing Step-0 T1_N4 for ${subLong}"
+        echo "${site},${sub},${subLong},no_T1_N4" >> "${MISSING_T1_CSV}"
         continue
     fi
 
-    mask="${DLICV_DIR}/${subLong}/${subLong}_T1_LPS_dlicvmask.nii.gz"
-    if [ ! -f "${mask}" ]; then
-        echo "  !! Missing required DLICV mask for ${subLong}"
-        echo "${site},${sub},${subLong},no_DLICV_mask" >> "${MISSING_T1_CSV}"
-        continue
-    fi
-    mask_note="dlicv_mask_available"
+    mask_note="dlicv_mask_n4_ready"
 
     echo "  [${site}/${sub}] -> ${subLong} (T1 OK, ${mask_note})"
 
@@ -128,7 +115,7 @@ ARRAY_RANGE="0-$((n - 1))"
 echo "Submitting SLURM array job for ${ARRAY_RANGE}..."
 
 sbatch \
-  --export=PROJ_DIR="${PROJ_DIR}",PROTO_DIR="${PROTO_DIR}",REORIENT_DIR="${REORIENT_DIR}",DLICV_DIR="${DLICV_DIR}",ATLAS_DIR="${ATLAS_DIR}",LIST_DIR="${LIST_DIR}",SUBJECT_LIST="${SUBJECT_LIST}",MNI_TEMPLATE="${MNI_TEMPLATE}",FSLOUTPUTTYPE='NIFTI_GZ',T1_MNI_MODE="${T1_MNI_MODE}" \
+  --export=PROJ_DIR="${PROJ_DIR}",PROTO_DIR="${PROTO_DIR}",ATLAS_DIR="${ATLAS_DIR}",LIST_DIR="${LIST_DIR}",SUBJECT_LIST="${SUBJECT_LIST}",MNI_TEMPLATE="${MNI_TEMPLATE}",FSLOUTPUTTYPE='NIFTI_GZ',T1_MNI_MODE="${T1_MNI_MODE}" \
   --array="${ARRAY_RANGE}" "${SCRIPTS_DIR}/Step2_T1_to_MNI.sh"
 
 echo "Submitted!"
