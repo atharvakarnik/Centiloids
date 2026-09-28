@@ -17,7 +17,7 @@ PROJ_DIR="${HOME}/Pipelines/Centiloids"
 LIST_DIR="${PROJ_DIR}/Lists/Jun26"
 PROTO_DIR="${PROJ_DIR}/Protocols/Jun26"
 REORIENT_DIR="${PROJ_DIR}/Data/ReOrientedLPS"
-DLICV_DIR="${PROJ_DIR}/Data/DLICV"      # Optional masks (not used in worker unless you enable it)
+DLICV_DIR="${HOME}/Pipelines/DPPOS_DLICV_2022/Protocols/DLICV"
 ATLAS_DIR="${PROJ_DIR}/Data/Atlases"
 SCRIPTS_DIR="${PROJ_DIR}/Scripts"
 
@@ -63,6 +63,11 @@ if [ ! -f "${MNI_TEMPLATE}" ]; then
     exit 1
 fi
 
+if [ ! -d "${DLICV_DIR}" ]; then
+    echo "ERROR: DLICV_DIR does not exist: ${DLICV_DIR}"
+    exit 1
+fi
+
 if [ ! -f "${S1_SELECTION}" ]; then
     echo "ERROR: Step1 selection file not found:"
     echo "  ${S1_SELECTION}"
@@ -88,10 +93,12 @@ tail -n +2 "${S1_SELECTION}" | awk -F',' '{print $1,$2,$3}' | sort -u | while re
     fi
 
     mask="${DLICV_DIR}/${subLong}/${subLong}_T1_LPS_dlicvmask.nii.gz"
-    mask_note="no_mask"
-    if [ -f "${mask}" ]; then
-        mask_note="mask_available"
+    if [ ! -f "${mask}" ]; then
+        echo "  !! Missing required DLICV mask for ${subLong}"
+        echo "${site},${sub},${subLong},no_DLICV_mask" >> "${MISSING_T1_CSV}"
+        continue
     fi
+    mask_note="dlicv_mask_available"
 
     echo "  [${site}/${sub}] -> ${subLong} (T1 OK, ${mask_note})"
 

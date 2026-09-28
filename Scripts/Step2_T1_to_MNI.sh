@@ -63,11 +63,13 @@ export OSrelease="${OSrelease:-centos7}"
 export ARCH="${ARCH:-$(uname -m)}"
 
 module use /cbica/share/modules
+module load fsl/5.0.11
 module load gcc/5.2.0
 module load ants/2.3.1
 
 threads="${SLURM_CPUS_PER_TASK:-8}"
 export ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS="${threads}"
+export FSLOUTPUTTYPE="NIFTI_GZ"
 
 # ------- I can't tolerate ANTs not visible to 10% nodes in the same parition! -------
 ANTS_ROOT="${ANTS_ROOT:-/cbica/software/external/ants/centos7/2.3.1}"
@@ -143,10 +145,40 @@ site=$(echo "${map_line}" | awk '{print $1}')
 sub=$(echo "${map_line}" | awk '{print $2}')
 subLong=$(echo "${map_line}" | awk '{print $3}')
 
-t1="${REORIENT_DIR}/${subLong}/${subLong}_T1_LPS.nii.gz"
-if [ ! -f "${t1}" ]; then
-    echo "  !! Missing T1 for ${subLong}: ${t1}"
+t1_raw="${REORIENT_DIR}/${subLong}/${subLong}_T1_LPS.nii.gz"
+mask="${DLICV_DIR}/${subLong}/${subLong}_T1_LPS_dlicvmask.nii.gz"
+t1_preproc_dir="${PROTO_DIR}/T1_Preproc/${subLong}"
+t1="${t1_preproc_dir}/${subLong}_T1_N4.nii.gz"
+t1_n4_brain="${t1_preproc_dir}/${subLong}_T1_N4_brain.nii.gz"
+t1_preproc_helper="${PROJ_DIR}/Scripts/T1_preprocess_N4.sh"
+
+if [ ! -f "${t1_raw}" ]; then
+    echo "  !! Missing T1 for ${subLong}: ${t1_raw}"
     echo "${site},${sub},${subLong},missing_T1" >> "${MISS_CSV}"
+    exit 1
+fi
+
+if [ ! -f "${mask}" ]; then
+    echo "  !! Missing required DLICV mask for ${subLong}: ${mask}"
+    echo "${site},${sub},${subLong},missing_DLICV_mask" >> "${MISS_CSV}"
+    exit 1
+fi
+
+if [ ! -f "${t1_preproc_helper}" ]; then
+    echo "  !! Missing T1 preprocessing helper: ${t1_preproc_helper}"
+    echo "${site},${sub},${subLong},missing_T1_preprocess_helper" >> "${MISS_CSV}"
+    exit 1
+fi
+
+if ! bash "${t1_preproc_helper}" "${t1_raw}" "${mask}" "${PROTO_DIR}" "${subLong}"; then
+    echo "  !! Shared T1 preprocessing failed for ${subLong}."
+    echo "${site},${sub},${subLong},T1_preprocess_failed" >> "${MISS_CSV}"
+    exit 1
+fi
+
+if [ ! -f "${t1}" ] || [ ! -f "${t1_n4_brain}" ]; then
+    echo "  !! Shared T1 preprocessing outputs missing for ${subLong}."
+    echo "${site},${sub},${subLong},T1_preprocess_outputs_missing" >> "${MISS_CSV}"
     exit 1
 fi
 
@@ -161,18 +193,11 @@ out_mni_t1="${out_dir}/${subLong}_MNI_rT1.nii.gz"
 
 echo
 echo "Subject: ${site} / ${sub} / ${subLong}"
-echo "T1     : ${t1}"
+echo "T1_N4  : ${t1}"
 echo "OutDir : ${out_dir}"
 echo
 
-# Optional mask (kept for future; not used by default)
-mask="${DLICV_DIR}/${subLong}/${subLong}_T1_LPS_dlicvmask.nii.gz"
-mask_used="none"
-# args_mask=()
-# if [ -f "${mask}" ]; then
-#     args_mask=(-x "${mask}")
-#     mask_used="dlicv_mask"
-# fi
+mask_used="dlicv_mask_n4"
 
 if [ "${T1_MNI_MODE}" = "Syn" ]; then
     echo " -> Using antsRegistrationSyN.sh (baseline)"
@@ -195,7 +220,6 @@ if [ "${T1_MNI_MODE}" = "Syn" ]; then
         -i "${INIT_MAT}" \
         -o "${out_prefix}" \
         -n "${threads}"
-        # "${args_mask[@]}"  # enable if you want to constrain with mask
 
 elif [ "${T1_MNI_MODE}" = "SPMlike" ]; then
     echo " -> Using tissue-prior guided 'unified-like' normalization (FSL priors + Atropos + multi-channel ANTs)"
@@ -216,12 +240,10 @@ elif [ "${T1_MNI_MODE}" = "SPMlike" ]; then
     work="${out_dir}/unifiedlike_work"
     mkdir -p "${work}"
 
-    t1_n4="${work}/${subLong}_T1_N4.nii.gz"
-    echo "    [1/5] N4 bias correction..."
-    N4BiasFieldCorrection -d 3 -i "${t1}" -o "${t1_n4}" -v 1
+    t1_n4="${t1}"
 
     init_ai="${work}/${subLong}_init_ai.mat"
-    echo "    [2/6] antsAI rigid initialization..."
+    echo "    [1/5] antsAI rigid initialization with shared T1_N4..."
     antsAI \
       -d 3 \
       -m MI["${MNI_TEMPLATE}","${t1_n4}",32,Regular,0.25] \
@@ -234,7 +256,7 @@ elif [ "${T1_MNI_MODE}" = "SPMlike" ]; then
 
     # Initial low-DOF alignment to pull priors into subject space reliably
     init_prefix="${work}/${subLong}_init_"
-    echo "    [3/6] Initial Rigid+Affine (for prior warping)..."
+    echo "    [2/5] Initial Rigid+Affine (for prior warping)..."
     antsRegistration \
       -d 3 \
       --float 1 \
@@ -263,7 +285,7 @@ elif [ "${T1_MNI_MODE}" = "SPMlike" ]; then
     # Warp priors (template space) into subject space using inverse affine
     # Create Atropos prior set as %02d in subject space (01=GM, 02=WM, 03=CSF)
     prior_subj_pat="${work}/${subLong}_prior_subj_%02d.nii.gz"
-    echo "    [4/6] Warping priors to subject space..."
+    echo "    [3/5] Warping priors to subject space..."
     antsApplyTransforms -d 3 -r "${t1_n4}" -i "${prior_gm}"  -o "$(printf "${prior_subj_pat}" 1)" -n Linear -t ["${init_aff}",1]
     antsApplyTransforms -d 3 -r "${t1_n4}" -i "${prior_wm}"  -o "$(printf "${prior_subj_pat}" 2)" -n Linear -t ["${init_aff}",1]
     antsApplyTransforms -d 3 -r "${t1_n4}" -i "${prior_csf}" -o "$(printf "${prior_subj_pat}" 3)" -n Linear -t ["${init_aff}",1]
@@ -271,7 +293,7 @@ elif [ "${T1_MNI_MODE}" = "SPMlike" ]; then
     # Atropos segmentation with priors -> subject tissue posteriors
     post_pat="${work}/${subLong}_post_%02d.nii.gz"
     seg="${work}/${subLong}_seg.nii.gz"
-    echo "    [5/6] Atropos segmentation (GM/WM/CSF posteriors)..."
+    echo "    [4/5] Atropos segmentation (GM/WM/CSF posteriors)..."
 
     # Build a robust binary mask from warped priors: (GM + WM + CSF) > thr
     prior1="$(printf "${prior_subj_pat}" 1)"
@@ -300,7 +322,7 @@ elif [ "${T1_MNI_MODE}" = "SPMlike" ]; then
 
     # Now do multi-channel registration: T1 + (GM/WM/CSF) channels
     # fixed: template T1, template priors; moving: subject T1, subject posteriors
-    echo "    [6/6] Multi-channel registration (T1 + tissue channels)..."
+    echo "    [5/5] Multi-channel registration (T1 + tissue channels)..."
     antsRegistration \
       -d 3 \
       --float 1 \

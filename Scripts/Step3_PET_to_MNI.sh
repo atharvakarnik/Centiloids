@@ -4,11 +4,11 @@
 #     Adapted from GAAIN's vld to DPPOS Dataset     #
 # ------------------------------------------------- #
 #
-# Step3_PET_to_MNI.sh (Validation-friendly)
-# PET(T1) -> PET(MNI/template grid), optional smoothing.
+# Step3_PET_to_MNI.sh
+# Native canonical PET -> PET(MNI/template grid) in one interpolation, optional smoothing.
 #
 # Exports expected:
-#   PROJ_DIR, PROTO_DIR, LIST_DIR, SUBJECT_LIST, MNI_TEMPLATE
+#   PROJ_DIR, PROTO_DIR, LIST_DIR, SUBJECT_LIST, MNI_TEMPLATE, PET_TAG
 #   SMOOTH_FWHM_MM (e.g., "0" for validation, "8" for cohort)
 #
 #SBATCH --partition=all
@@ -27,6 +27,7 @@ set -euo pipefail
 : "${LIST_DIR:?LIST_DIR is not set}"
 : "${SUBJECT_LIST:?SUBJECT_LIST is not set}"
 : "${MNI_TEMPLATE:?MNI_TEMPLATE is not set}"
+: "${PET_TAG:?PET_TAG is not set}"
 : "${SMOOTH_FWHM_MM:=0}"   # default: no smoothing unless wrapper sets it
 
 # Make the batch shell deterministic. Not depending COMPLETELY on the submit shell's PATH.
@@ -108,7 +109,7 @@ if command -v ldd >/dev/null 2>&1 && command -v grep >/dev/null 2>&1; then
 fi
 # --------------------------------------------------------------------------------------
 
-FSLOUTPUTTYPE='NIFTI_GZ'
+export FSLOUTPUTTYPE='NIFTI_GZ'
 
 REG_PET_T1_DIR="${PROTO_DIR}/Registration_PET_to_T1"
 REG_T1_MNI_DIR="${PROTO_DIR}/Registration_T1_to_MNI"
@@ -120,7 +121,7 @@ SELECTION_CSV="${LIST_DIR}/s3_petmni_registration.csv"
 MISSING_CSV="${LIST_DIR}/s3_petmni_missing.csv"
 
 if [ ! -f "${SELECTION_CSV}" ]; then
-  echo "SITE,SUB,SUBLONG,PET_rT1,WARP,AFFINE,PET_rMNI,PET_rMNI_s8,NOTE" > "${SELECTION_CSV}"
+  echo "SITE,SUB,SUBLONG,PET_OG,WARP,AFFINE,PET_rMNI,PET_rMNI_s8,NOTE" > "${SELECTION_CSV}"
 fi
 if [ ! -f "${MISSING_CSV}" ]; then
   echo "SITE,SUB,SUBLONG,REASON" > "${MISSING_CSV}"
@@ -143,7 +144,8 @@ site=$(echo "${line}" | awk '{print $1}')
 sub=$(echo  "${line}" | awk '{print $2}')
 subLong=$(echo "${line}" | awk '{print $3}')
 
-pet_rT1="${REG_PET_T1_DIR}/${subLong}/${subLong}_PET_rT1.nii.gz"
+pet_og="${PROTO_DIR}/PET_Preproc/${site}/${sub}/${sub}_${PET_TAG}.nii.gz"
+pet2t1="${REG_PET_T1_DIR}/${subLong}/${subLong}_PET2T1.mat"
 warp="${REG_T1_MNI_DIR}/${subLong}/${subLong}_T1_rMNI_1Warp.nii.gz"
 affine="${REG_T1_MNI_DIR}/${subLong}/${subLong}_T1_rMNI_0GenericAffine.mat"
 
@@ -151,12 +153,17 @@ echo "=== Step3 (task ${idx}) ==="
 echo "subLong        : ${subLong}"
 echo "MNI_TEMPLATE   : ${MNI_TEMPLATE}"
 echo "SMOOTH_FWHM_MM : ${SMOOTH_FWHM_MM}"
-echo "PET_rT1        : ${pet_rT1}"
+echo "PET_OG         : ${pet_og}"
+echo "PET2T1 rigid   : ${pet2t1}"
 echo "warp/affine    : ${warp} | ${affine}"
 echo
 
-if [ ! -f "${pet_rT1}" ]; then
-  echo "${site},${sub},${subLong},no_PET_rT1" >> "${MISSING_CSV}"
+if [ ! -f "${pet_og}" ]; then
+  echo "${site},${sub},${subLong},no_PET_OG" >> "${MISSING_CSV}"
+  exit 0
+fi
+if [ ! -f "${pet2t1}" ]; then
+  echo "${site},${sub},${subLong},no_PET2T1_transform" >> "${MISSING_CSV}"
   exit 0
 fi
 if [ ! -f "${warp}" ] || [ ! -f "${affine}" ]; then
@@ -177,12 +184,12 @@ out_pet_mni_s8="${out_dir}/${subLong}_PET_rMNI_s8.nii.gz"
 # If the required outputs already exist, skip
 if [ "${SMOOTH_FWHM_MM}" = "0" ]; then
   if [ -f "${out_pet_mni}" ]; then
-    echo "${site},${sub},${subLong},${pet_rT1},${warp},${affine},${out_pet_mni},,already_done_no_smooth" >> "${SELECTION_CSV}"
+    echo "${site},${sub},${subLong},${pet_og},${warp},${affine},${out_pet_mni},,already_done_no_smooth" >> "${SELECTION_CSV}"
     exit 0
   fi
 else
   if [ -f "${out_pet_mni_s8}" ]; then
-    echo "${site},${sub},${subLong},${pet_rT1},${warp},${affine},${out_pet_mni},${out_pet_mni_s8},already_done_smoothed" >> "${SELECTION_CSV}"
+    echo "${site},${sub},${subLong},${pet_og},${warp},${affine},${out_pet_mni},${out_pet_mni_s8},already_done_smoothed" >> "${SELECTION_CSV}"
     exit 0
   fi
 fi
@@ -192,8 +199,15 @@ threads="${SLURM_CPUS_PER_TASK:-1}"
 export ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS="${threads}"
 export OMP_NUM_THREADS="${threads}"
 
-echo "Applying transforms with antsApplyTransforms (threads=${threads})..."
-antsApplyTransforms -d 3 -i "${pet_rT1}" -r "${MNI_TEMPLATE}" -t "${warp}" -t "${affine}" -o "${out_pet_mni}"
+echo "Applying PET->T1 and T1->MNI transforms in one interpolation (threads=${threads})..."
+antsApplyTransforms -d 3 \
+  -i "${pet_og}" \
+  -r "${MNI_TEMPLATE}" \
+  -n Linear \
+  -t "${warp}" \
+  -t "${affine}" \
+  -t "${pet2t1}" \
+  -o "${out_pet_mni}"
 
 if [ ! -f "${out_pet_mni}" ]; then
   echo "${site},${sub},${subLong},ants_missing_pet_mni" >> "${MISSING_CSV}"
@@ -202,7 +216,7 @@ fi
 
 # Optional smoothing
 if [ "${SMOOTH_FWHM_MM}" = "0" ]; then
-  echo "${site},${sub},${subLong},${pet_rT1},${warp},${affine},${out_pet_mni},,OK_no_smoothing" >> "${SELECTION_CSV}"
+  echo "${site},${sub},${subLong},${pet_og},${warp},${affine},${out_pet_mni},,OK_no_smoothing" >> "${SELECTION_CSV}"
   exit 0
 fi
 
@@ -223,7 +237,7 @@ if [ ! -f "${out_pet_mni_s8}" ]; then
   exit 1
 fi
 
-echo "${site},${sub},${subLong},${pet_rT1},${warp},${affine},${out_pet_mni},${out_pet_mni_s8},OK_smoothed" >> "${SELECTION_CSV}"
+echo "${site},${sub},${subLong},${pet_og},${warp},${affine},${out_pet_mni},${out_pet_mni_s8},OK_smoothed" >> "${SELECTION_CSV}"
 
 echo
 echo "Task ${idx} complete."

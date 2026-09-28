@@ -6,7 +6,7 @@
 #
 # Step3_wrapper_PET_to_MNI.sh
 #
-# Build subject list for PET(T1) -> PET(MNI) registration & smoothing,
+# Build subject list for one-shot native PET -> PET(MNI) resampling & smoothing,
 # then submit SLURM array.
 #
 # Usage:
@@ -14,12 +14,17 @@
 
 set -euo pipefail
 
+# IMPORTANT : Check this var meticulously to state correct cohort!!!
+PET_TAG="PET_3D"
+# ---------------------------------------------------------------- #
+
 PROJ_DIR="${HOME}/Pipelines/Centiloids"
 
 LIST_DIR="${PROJ_DIR}/Lists/Jun26"
 PROTO_DIR="${PROJ_DIR}/Protocols/Jun26"
 REG_PET_T1_DIR="${PROTO_DIR}/Registration_PET_to_T1"
 REG_T1_MNI_DIR="${PROTO_DIR}/Registration_T1_to_MNI"
+PREPROC_PET_ROOT="${PROTO_DIR}/PET_Preproc"
 ATLAS_DIR="${PROJ_DIR}/Data/Atlases"
 SCRIPTS_DIR="${PROJ_DIR}/Scripts"
 
@@ -38,9 +43,11 @@ SELECTION_CSV="${LIST_DIR}/s3_petmni_registration.csv"
 
 SMOOTH_FWHM_MM="0"      # Smoothing switch (in mm, 0 is None)
 
-echo "=== Step3: Wrapper for PET(T1)->PET(MNI) ==="
+echo "=== Step3: Wrapper for native PET->PET(MNI) ==="
 echo "PROJ_DIR         : ${PROJ_DIR}"
 echo "PROTO_DIR        : ${PROTO_DIR}"
+echo "PET_TAG          : ${PET_TAG}"
+echo "PREPROC_PET_ROOT : ${PREPROC_PET_ROOT}"
 echo "REG_PET_T1_DIR   : ${REG_PET_T1_DIR}"
 echo "REG_T1_MNI_DIR   : ${REG_T1_MNI_DIR}"
 echo "ATLAS_DIR        : ${ATLAS_DIR}"
@@ -71,7 +78,7 @@ if [ ! -f "${MISSING_CSV}" ]; then
 fi
 
 if [ ! -f "${SELECTION_CSV}" ]; then
-    echo "SITE,SUB,SUBLONG,PET_rT1,WARP,AFFINE,PET_rMNI,PET_rMNI_s8,NOTE" > "${SELECTION_CSV}"
+    echo "SITE,SUB,SUBLONG,PET_OG,WARP,AFFINE,PET_rMNI,PET_rMNI_s8,NOTE" > "${SELECTION_CSV}"
 fi
 
 echo "Building Stage-3 subject list from ${S2_REG_CSV}..."
@@ -92,14 +99,21 @@ tail -n +2 "${S2_REG_CSV}" | while IFS=',' read -r site sub subLong t1_path mni_
             ;;
     esac
 
-    pet_rT1="${REG_PET_T1_DIR}/${subLong}/${subLong}_PET_rT1.nii.gz"
+    pet_og="${PREPROC_PET_ROOT}/${site}/${sub}/${sub}_${PET_TAG}.nii.gz"
+    pet2t1="${REG_PET_T1_DIR}/${subLong}/${subLong}_PET2T1.mat"
     warp_dir="${REG_T1_MNI_DIR}/${subLong}"
     warp="${warp_dir}/${subLong}_T1_rMNI_1Warp.nii.gz"
     affine="${warp_dir}/${subLong}_T1_rMNI_0GenericAffine.mat"
 
-    if [ ! -f "${pet_rT1}" ]; then
-        echo "  [${site}/${sub}/${subLong}] PET_rT1 missing: ${pet_rT1}"
-        echo "${site},${sub},${subLong},no_PET_rT1" >> "${MISSING_CSV}"
+    if [ ! -f "${pet_og}" ]; then
+        echo "  [${site}/${sub}/${subLong}] Canonical Step-0 PET missing: ${pet_og}"
+        echo "${site},${sub},${subLong},no_PET_OG" >> "${MISSING_CSV}"
+        continue
+    fi
+
+    if [ ! -f "${pet2t1}" ]; then
+        echo "  [${site}/${sub}/${subLong}] PET->T1 rigid transform missing: ${pet2t1}"
+        echo "${site},${sub},${subLong},no_PET2T1_transform" >> "${MISSING_CSV}"
         continue
     fi
 
@@ -109,10 +123,9 @@ tail -n +2 "${S2_REG_CSV}" | while IFS=',' read -r site sub subLong t1_path mni_
         continue
     fi
 
-    echo "  [${site}/${sub}] -> ${subLong} (PET_rT1 & transforms OK)"
+    echo "  [${site}/${sub}] -> ${subLong} (native PET & transforms OK)"
     # Space-separated fields in CSV for array mapping
     echo "${site} ${sub} ${subLong}" >> "${SUBJECT_LIST}"
-    # echo "${site},${sub},${subLong},${pet_rT1},${warp},${affine},selected" >> "${SELECTION_CSV}"  # This is a bug, results in double rows. 
 done
 
 n=$(wc -l < "${SUBJECT_LIST}")
@@ -132,7 +145,7 @@ ARRAY_RANGE="0-$((n - 1))"
 echo "Submitting SLURM array job for ${ARRAY_RANGE}..."
 
 sbatch \
-    --export=PROJ_DIR="${PROJ_DIR}",PROTO_DIR="${PROTO_DIR}",LIST_DIR="${LIST_DIR}",MNI_TEMPLATE="${MNI_TEMPLATE}",SUBJECT_LIST="${SUBJECT_LIST}",SMOOTH_FWHM_MM="${SMOOTH_FWHM_MM}",FSLOUTPUTTYPE='NIFTI_GZ' \
+    --export=PROJ_DIR="${PROJ_DIR}",PROTO_DIR="${PROTO_DIR}",LIST_DIR="${LIST_DIR}",MNI_TEMPLATE="${MNI_TEMPLATE}",SUBJECT_LIST="${SUBJECT_LIST}",PET_TAG="${PET_TAG}",SMOOTH_FWHM_MM="${SMOOTH_FWHM_MM}",FSLOUTPUTTYPE='NIFTI_GZ' \
     --array="${ARRAY_RANGE}" "${SCRIPTS_DIR}/Step3_PET_to_MNI.sh"
 
 echo "Submitted!"
