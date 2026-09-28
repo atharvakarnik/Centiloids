@@ -306,9 +306,29 @@ if [ ! -f "${out_mat}" ]; then
     fi
     fslmaths "${pet_cluster_sizes}" -thr "${max_cluster_size}" -bin "${pet_lcc}"
 
-    read -r bbox_x bbox_nx bbox_y bbox_ny bbox_z bbox_nz <<< "$(fslstats "${pet_lcc}" -w)"
-    if [ "${bbox_nx}" -le 0 ] || [ "${bbox_ny}" -le 0 ] || [ "${bbox_nz}" -le 0 ]; then
+    bbox_output="$(fslstats "${pet_lcc}" -w)"
+    read -r -a bbox_fields <<< "${bbox_output}"
+    if ((${#bbox_fields[@]} < 6)); then
+        echo "  !! PET foreground bounding box has fewer than six fields: ${bbox_output}"
+        echo "${site},${sub},${subLong},PET_crop_invalid_bbox" >> "${MISSING_CSV}"
+        exit 1
+    fi
+
+    # FSL 5 emits eight fields for a 3D image: x/xsize, y/ysize,
+    # z/zsize, and a trailing t/tsize pair. Only the first six are spatial.
+    bbox_x="${bbox_fields[0]}"
+    bbox_nx="${bbox_fields[1]}"
+    bbox_y="${bbox_fields[2]}"
+    bbox_ny="${bbox_fields[3]}"
+    bbox_z="${bbox_fields[4]}"
+    bbox_nz="${bbox_fields[5]}"
+
+    if [[ ! "${bbox_x}" =~ ^[0-9]+$ || ! "${bbox_nx}" =~ ^[0-9]+$ ||
+          ! "${bbox_y}" =~ ^[0-9]+$ || ! "${bbox_ny}" =~ ^[0-9]+$ ||
+          ! "${bbox_z}" =~ ^[0-9]+$ || ! "${bbox_nz}" =~ ^[0-9]+$ ]] ||
+       ((bbox_nx <= 0 || bbox_ny <= 0 || bbox_nz <= 0)); then
         echo "  !! Invalid PET foreground bounding box."
+        echo "     fslstats -w: ${bbox_output}"
         echo "${site},${sub},${subLong},PET_crop_invalid_bbox" >> "${MISSING_CSV}"
         exit 1
     fi
