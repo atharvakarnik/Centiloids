@@ -6,7 +6,7 @@
 #
 # Inputs:
 #  - ${LIST_DIR}/s4B_suvr_status.csv
-#  - coefficients CSV (stored in Lists/<DATASET>/Calibration/)
+#  - shared coefficients CSV (stored in Lists/Calibrated_Coeff/)
 #
 set -euo pipefail
 
@@ -17,7 +17,7 @@ LIST_DIR="${PROJ_DIR}/Lists/${DATASET}"
 PROTO_DIR="${PROJ_DIR}/Protocols/${DATASET}"
 
 S4_STATUS="${LIST_DIR}/s4B_suvr_status.csv"
-COEF_CSV="${LIST_DIR}/Calibration/centiloid_coefficients_FBP_WC.csv"
+COEF_CSV="${PROJ_DIR}/Lists/Calibrated_Coeff/centiloid_coefficients_FBP_WC.csv"
 
 OUT_DIR="${PROTO_DIR}/Centiloid_Scores_WC"
 mkdir -p "${OUT_DIR}"
@@ -33,6 +33,24 @@ import numpy as np
 
 s4 = pd.read_csv("${S4_STATUS}")
 coef = pd.read_csv("${COEF_CSV}")
+
+expected_columns = ["model", "slope", "intercept"]
+if list(coef.columns) != expected_columns:
+    raise ValueError(
+        f"Expected coefficient columns {expected_columns}, got {list(coef.columns)}"
+    )
+
+expected_models = {
+    "PiB_SUVR_to_CL",
+    "FBP_to_PiB_eq_SUVR",
+    "FBP_to_CL_direct",
+}
+actual_models = set(coef["model"].astype(str).str.strip())
+if actual_models != expected_models or len(coef) != len(expected_models):
+    raise ValueError(
+        f"Expected exactly one row for each model {sorted(expected_models)}, "
+        f"got {sorted(actual_models)} across {len(coef)} rows"
+    )
 
 # Pull coefficients
 def get_row(model):
@@ -57,21 +75,27 @@ ok = ok.dropna(subset=["SUVR_WC"])
 
 # Apply Approach B chain
 ok["SUVR_pibeq"] = m*ok["SUVR_WC"] + c
-ok["CL"] = a*ok["SUVR_pibeq"] + b
+ok["Centiloid_WC"] = a*ok["SUVR_pibeq"] + b
 
-# Keep useful columns
-keep = ["subLong","tracer","SUVR_WC","SUVR_pibeq","CL","mean_ctx","mean_wc","pet_rMNI","note"]
+# Rename result fields and omit tracer/path from the consolidated output.
+ok = ok.rename(columns={
+    "subLong": "ID",
+    "mean_ctx": "SUV_Ctx",
+    "mean_wc": "SUV_WC",
+})
+
+keep = ["ID","SUVR_WC","SUVR_pibeq","Centiloid_WC","SUV_Ctx","SUV_WC","note"]
 for col in keep:
     if col not in ok.columns:
         ok[col] = np.nan
 
 # Sort and write
-ok = ok[keep].sort_values(["tracer","subLong"])
+ok = ok[keep].sort_values(["ID"])
 ok.to_csv("${OUT_CSV}", index=False)
 
 print("Wrote:", "${OUT_CSV}")
 print("Applied coefficients:")
 print(f"a={a}, b={b}, m={m}, c={c}")
-print("\nCL summary:")
-print(ok["CL"].describe())
+print("\nCentiloid_WC summary:")
+print(ok["Centiloid_WC"].describe())
 PY

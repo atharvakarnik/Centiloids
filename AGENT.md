@@ -16,12 +16,12 @@
 3. **Step 2 — T1-to-MNI registration:** Register the structural T1 to the configured MNI template and retain the forward transform files below `Protocols/<batch>/Registration_T1_to_MNI/` for later reuse.
 4. **Step 3 — PET-to-MNI transform application:** Apply the saved T1-to-MNI transforms to the Step 1 PET-in-T1 image. Optional smoothing is controlled by `SMOOTH_FWHM_MM`, which must agree with the Step 4 wrapper.
 5. **Step 4 — mask-based uptake extraction:** Use the MNI-space cortical target and whole-cerebellum masks on each MNI-space PET, record mean uptake values, calculate whole-cerebellum-referenced SUVR, and consolidate per-subject results.
-6. **Step 5 — Centiloid calculation:** Read the consolidated SUVR results and the pre-calculated calibration coefficients, apply the FBP-to-PiB-equivalent and PiB-SUVR-to-Centiloid transforms, and write one batch-level Centiloid CSV.
+6. **Step 5 — Centiloid calculation:** Read the consolidated SUVR results and the shared coefficients in `Lists/Calibrated_Coeff/centiloid_coefficients_FBP_WC.csv`, apply the FBP-to-PiB-equivalent and PiB-SUVR-to-Centiloid transforms, and write one batch-level Centiloid CSV. Its result fields are `ID`, `SUVR_WC`, `SUVR_pibeq`, `Centiloid_WC`, `SUV_Ctx`, and `SUV_WC`, with the audit `note` retained; tracer and source-image path are omitted.
 
 ## Development rules
 
 - Preserve the direct dependency chain Step 0 -> Step 1 -> Step 2 -> Step 3 -> Step 4 -> Step 5.
-- Treat `PET_TAG`, `DATASET`, `LIST_DIR`, `PROTO_DIR`, templates, masks, CSV headers, status/note values, and filename patterns as interfaces between stages. Check both the worker and its wrapper when changing one of these interfaces.
+- Treat `PET_TAG`, `DATASET`, `LIST_DIR`, `PROTO_DIR`, templates, masks, the shared calibration file, CSV headers, status/note values, and filename patterns as interfaces between stages. Check both the worker and its wrapper when changing one of these interfaces.
 - Keep scripts fail-fast (`set -euo pipefail` or the existing stricter variant), array-task-safe, rerunnable where existing output checks provide idempotency, and explicit about missing inputs.
 - Preserve the site/subject/long-subject mapping used by subject lists. Do not assume paths may be rewritten merely because the corresponding data is absent from this clone.
 - Maintain compatibility with the repository's SLURM/HPC environment and its existing FSL, ANTs, Lmod, micromamba, and Python/pandas setup unless a requested change explicitly replaces one of them.
