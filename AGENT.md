@@ -18,6 +18,15 @@
 5. **Step 4 — mask-based uptake extraction:** Use the MNI-space cortical target and whole-cerebellum masks on each MNI-space PET, record mean uptake values, calculate whole-cerebellum-referenced SUVR, and consolidate per-subject results.
 6. **Step 5 — Centiloid calculation:** Read the consolidated SUVR results and the shared coefficients in `Lists/Calibrated_Coeff/centiloid_coefficients_FBP_WC.csv`, apply the FBP-to-PiB-equivalent and PiB-SUVR-to-Centiloid transforms, and write one batch-level Centiloid CSV. Its result fields are `ID`, `SUVR_WC`, `SUVR_pibeq`, `Centiloid_WC`, `SUV_Ctx`, and `SUV_WC`, with the audit `note` retained; tracer and source-image path are omitted.
 
+## SLURM/HPC environment constraints
+
+- Treat the compute-node environment as cluster-specific and different from the submission shell. Do not introduce generic module, executable, or library locations merely because they are conventional on another Linux system. Derive changes from paths already used successfully by the production workers or from actual successful SLURM logs; ask the user when a required path remains ambiguous.
+- Lmod is initialized from `/cubic/software/centos7/lmod/lmod/init/bash` and uses `/cbica/share/modules`. The established installations are FSL 5.0.11 under `/cbica/software/external/fsl/centos7/5.0.11`, ANTs 2.3.1 under `/cbica/software/external/ants/centos7/2.3.1`, and the GCC 5.2.0 runtime under `/cbica/software/external/gcc/centos7/5.2.0`.
+- Loading modules or sourcing `${FSLDIR}/etc/fslconf/fsl.sh` can overwrite `PATH` or related variables inside a SLURM task. Capture the incoming path before initialization, then rebuild the final `PATH` only after all required modules/configuration files are loaded. Preserve the established ordering of explicit ANTs/FSL bins, `/usr/local/bin`, `/usr/bin`, `/bin`, and the original SLURM path. Validate required external commands such as `sed`, `awk`, FSL tools, and ANTs tools against that final environment before using them.
+- The `gcc/5.2.0` module is known to expose its runtime libraries without necessarily exposing a `gcc` executable. Never use `command -v gcc` or `gcc -print-file-name` as a prerequisite. For ANTs, retain the proven `libstdc++.so.6` path `/cbica/software/external/gcc/centos7/5.2.0/lib64/libstdc++.so.6` and verify the effective resolution with `ldd` when changing its environment setup.
+- Treat `PATH`, `LD_LIBRARY_PATH`, `FSLDIR`, `ANTSPATH`, `OSrelease`, `ARCH`, `FSLOUTPUTTYPE`, and thread-control variables as an ordered interface. Do not replace, reorder, or append conflicting locations without checking the worker, its wrapper exports, and a known-working later-stage setup. Preserve module-generated tails when explicit prefixes are required for combined toolchains such as FSL plus ANTs.
+- `sbatch` retains the submitted script contents. Pulling or editing the repository does not update jobs that were already submitted, so environment fixes must be verified with newly submitted jobs and their logs.
+
 ## Development rules
 
 - Preserve the direct dependency chain Step 0 -> Step 1 -> Step 2 -> Step 3 -> Step 4 -> Step 5.
