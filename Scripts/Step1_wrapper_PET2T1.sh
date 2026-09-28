@@ -31,6 +31,7 @@ MODULE_ROOT="/cbica/share/modules"
 FSL_MODULE="fsl/5.0.11"
 GCC_MODULE="gcc/5.2.0"
 ANTS_MODULE="ants/2.3.1"
+FSLDIR="/cbica/software/external/fsl/centos7/5.0.11"
 ANTS_ROOT="/cbica/software/external/ants/centos7/2.3.1"
 ANTS_MODULE_LIB="/cbica/software/external/ANTs/centos7/2.3.1/lib"
 GCC_ROOT="/cbica/software/external/gcc/centos7/5.2.0"
@@ -50,6 +51,7 @@ echo "REORIENT_DIR   : ${REORIENT_DIR}"
 echo "T1_PREPROC_ROOT: ${T1_PREPROC_ROOT}"
 echo "LIST_DIR       : ${LIST_DIR}"
 echo "SUBJECT_LIST   : ${SUBJECT_LIST}"
+echo "FSLDIR         : ${FSLDIR}"
 echo "ANTS_ROOT      : ${ANTS_ROOT}"
 echo "GCC_LIBSTDCPP  : ${GCC_LIBSTDCPP}"
 echo "==============================================="
@@ -159,7 +161,7 @@ ARRAY_RANGE="0-$((n - 1))"
 echo "Submitting SLURM array job for ${ARRAY_RANGE}..."
 
 sbatch \
-    --export=PROJ_DIR="${PROJ_DIR}",PROTO_DIR="${PROTO_DIR}",LIST_DIR="${LIST_DIR}",SUBJECT_LIST="${SUBJECT_LIST}",PET_TAG="${PET_TAG}",FSLOUTPUTTYPE="NIFTI_GZ",LMOD_INIT="/cubic/software/centos7/lmod/lmod/init/bash",OSrelease="${OSrelease:-centos7}",MODULE_ROOT="${MODULE_ROOT}",FSL_MODULE="${FSL_MODULE}",GCC_MODULE="${GCC_MODULE}",ANTS_MODULE="${ANTS_MODULE}",ANTS_ROOT="${ANTS_ROOT}",ANTS_MODULE_LIB="${ANTS_MODULE_LIB}",GCC_ROOT="${GCC_ROOT}",GCC_LIBSTDCPP="${GCC_LIBSTDCPP}" \
+    --export=PROJ_DIR="${PROJ_DIR}",PROTO_DIR="${PROTO_DIR}",LIST_DIR="${LIST_DIR}",SUBJECT_LIST="${SUBJECT_LIST}",PET_TAG="${PET_TAG}",FSLOUTPUTTYPE="NIFTI_GZ",LMOD_INIT="/cubic/software/centos7/lmod/lmod/init/bash",OSrelease="${OSrelease:-centos7}",MODULE_ROOT="${MODULE_ROOT}",FSL_MODULE="${FSL_MODULE}",GCC_MODULE="${GCC_MODULE}",ANTS_MODULE="${ANTS_MODULE}",FSLDIR="${FSLDIR}",ANTS_ROOT="${ANTS_ROOT}",ANTS_MODULE_LIB="${ANTS_MODULE_LIB}",GCC_ROOT="${GCC_ROOT}",GCC_LIBSTDCPP="${GCC_LIBSTDCPP}" \
     --array="${ARRAY_RANGE}" "${SCRIPTS_DIR}/Step1_PET2T1.sh"
 
 echo "Submitted!"

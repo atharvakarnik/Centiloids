@@ -35,17 +35,9 @@ trap 'echo "ERROR: line ${LINENO}: ${BASH_COMMAND}" >&2' ERR
 : "${PET_TAG:?PET_TAG is not set}"
 
 # Make the batch shell deterministic. Not depending COMPLETELY on the submit shell's PATH.
-export PATH="/usr/local/bin:/usr/bin:/bin${PATH:+:${PATH}}"
+ORIG_PATH="${PATH:-}"
+export PATH="/usr/local/bin:/usr/bin:/bin${ORIG_PATH:+:${ORIG_PATH}}"
 export LD_LIBRARY_PATH="${LD_LIBRARY_PATH:-}"
-
-prepend_path() {
-    local var="$1" dir="$2" old="${!var-}"
-    [[ -d "${dir}" ]] || return 0
-    case ":${old}:" in
-        *":${dir}:"*) ;;
-        *) export "${var}=${dir}${old:+:${old}}" ;;
-    esac
-}
 
 LMOD_INIT="${LMOD_INIT:-/cubic/software/centos7/lmod/lmod/init/bash}"
 
@@ -69,11 +61,38 @@ MODULE_ROOT="${MODULE_ROOT:-/cbica/share/modules}"
 FSL_MODULE="${FSL_MODULE:-fsl/5.0.11}"
 GCC_MODULE="${GCC_MODULE:-gcc/5.2.0}"
 ANTS_MODULE="${ANTS_MODULE:-ants/2.3.1}"
+export FSLDIR="${FSLDIR:-/cbica/software/external/fsl/centos7/5.0.11}"
+ANTS_ROOT="${ANTS_ROOT:-/cbica/software/external/ants/centos7/2.3.1}"
 
 module use "${MODULE_ROOT}"
 module load "${FSL_MODULE}"
 module load "${GCC_MODULE}"
 module load "${ANTS_MODULE}"
+
+[[ -d "${FSLDIR}/bin" ]] || {
+    echo "ERROR: Expected FSL bin directory not found: ${FSLDIR}/bin" >&2
+    exit 127
+}
+
+if [[ -r "${FSLDIR}/etc/fslconf/fsl.sh" ]]; then
+    set +u
+    . "${FSLDIR}/etc/fslconf/fsl.sh"
+    set -u
+fi
+
+# FSL/module initialization can replace PATH. Rebuild it explicitly using the
+# same core and FSL locations used by the production Step-4 worker, with the
+# Step-2 ANTs installation first.
+export PATH="${ANTS_ROOT}/bin:${FSLDIR}/bin:/usr/local/bin:/usr/bin:/bin${ORIG_PATH:+:${ORIG_PATH}}"
+hash -r
+
+for core_cmd in sed awk grep mkdir; do
+    command -v "${core_cmd}" >/dev/null 2>&1 || {
+        echo "ERROR: Required core command not found after module setup: ${core_cmd}" >&2
+        echo "PATH=${PATH}" >&2
+        exit 127
+    }
+done
 
 export OMP_NUM_THREADS="${SLURM_CPUS_PER_TASK:-1}"
 export ITK_GLOBAL_DEFAULT_NUMBER_OF_THREADS="${SLURM_CPUS_PER_TASK:-1}"
@@ -99,7 +118,6 @@ echo "ulimit -Ht after : $(ulimit -Ht)"
 # ---------------------------------------------------
 
 # ------- Pin ANTs and its proven GCC runtime on every compute node -------
-ANTS_ROOT="${ANTS_ROOT:-/cbica/software/external/ants/centos7/2.3.1}"
 ANTS_MODULE_LIB="${ANTS_MODULE_LIB:-/cbica/software/external/ANTs/centos7/2.3.1/lib}"
 GCC_ROOT="${GCC_ROOT:-/cbica/software/external/gcc/centos7/5.2.0}"
 GCC_LIBSTDCPP="${GCC_LIBSTDCPP:-${GCC_ROOT}/lib64/libstdc++.so.6}"
@@ -114,7 +132,6 @@ for ants_exe in "${ANTS_REGISTRATION}" "${ANTS_APPLY_TRANSFORMS}"; do
 done
 
 export ANTSPATH="${ANTS_ROOT}/bin/"
-prepend_path PATH "${ANTS_ROOT}/bin"
 
 # Put the library ordering observed in a successful Step-2 compute-node log
 # first. Keep the module-generated tail because Step 1 additionally uses FSL.
@@ -136,6 +153,10 @@ echo "ANTS_MODULE        : ${ANTS_MODULE}"
 echo "ANTS_REGISTRATION  : ${ANTS_REGISTRATION}"
 echo "ANTS_APPLY_XFORMS  : ${ANTS_APPLY_TRANSFORMS}"
 echo "ANTSPATH           : ${ANTSPATH}"
+echo "FSLDIR             : ${FSLDIR}"
+echo "PATH               : ${PATH}"
+echo "sed                : $(command -v sed)"
+echo "awk                : $(command -v awk)"
 echo "Expected libstdc++ : ${GCC_LIBSTDCPP}"
 echo "LD_LIBRARY_PATH    : ${LD_LIBRARY_PATH}"
 
