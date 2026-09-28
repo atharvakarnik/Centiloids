@@ -22,7 +22,7 @@ LIST_DIR="${PROJ_DIR}/Lists/Jun26"
 PROTO_DIR="${PROJ_DIR}/Protocols/Jun26"
 PREPROC_PET_ROOT="${PROTO_DIR}/PET_Preproc"
 REORIENT_DIR="${PROJ_DIR}/Data/ReOrientedLPS"
-DLICV_DIR="${HOME}/Pipelines/DPPOS_DLICV_2022/Protocols/DLICV"
+T1_PREPROC_ROOT="${PROTO_DIR}/T1_Preproc"
 SCRIPTS_DIR="${PROJ_DIR}/Scripts"
 
 mkdir -p "${LIST_DIR}" "${PROTO_DIR}"
@@ -36,7 +36,7 @@ echo "=== Step1: Wrapper for PET->T1 registration ==="
 echo "PROJ_DIR       : ${PROJ_DIR}"
 echo "PREPROC_PET    : ${PREPROC_PET_ROOT}"
 echo "REORIENT_DIR   : ${REORIENT_DIR}"
-echo "DLICV_DIR      : ${DLICV_DIR}"
+echo "T1_PREPROC_ROOT: ${T1_PREPROC_ROOT}"
 echo "LIST_DIR       : ${LIST_DIR}"
 echo "SUBJECT_LIST   : ${SUBJECT_LIST}"
 echo "==============================================="
@@ -49,11 +49,6 @@ fi
 
 if [ ! -d "${REORIENT_DIR}" ]; then
     echo "ERROR: REORIENT_DIR does not exist: ${REORIENT_DIR}"
-    exit 1
-fi
-
-if [ ! -d "${DLICV_DIR}" ]; then
-    echo "ERROR: DLICV_DIR does not exist: ${DLICV_DIR}"
     exit 1
 fi
 
@@ -118,21 +113,14 @@ for site_dir in "${PREPROC_PET_ROOT}"/*; do
             note="multi_match_used_latest"
         fi
 
-        t1="${REORIENT_DIR}/${subLong}/${subLong}_T1_LPS.nii.gz"
-        if [ ! -f "${t1}" ]; then
-            echo "  [${site}/${sub}/${subLong}] T1 file not found, skipping."
-            echo "${site},${sub},${subLong},no_T1_file" >> "${MISSING_T1_CSV}"
+        t1_n4_brain="${T1_PREPROC_ROOT}/${subLong}/${subLong}_T1_N4_brain.nii.gz"
+        if [ ! -f "${t1_n4_brain}" ]; then
+            echo "  [${site}/${sub}/${subLong}] Step-0 T1_N4_brain not found, skipping."
+            echo "${site},${sub},${subLong},no_T1_N4_brain" >> "${MISSING_T1_CSV}"
             continue
         fi
 
-        dlicv_mask="${DLICV_DIR}/${subLong}/${subLong}_T1_LPS_dlicvmask.nii.gz"
-        if [ ! -f "${dlicv_mask}" ]; then
-            echo "  [${site}/${sub}/${subLong}] Required DLICV mask not found, skipping."
-            echo "${site},${sub},${subLong},no_DLICV_mask" >> "${MISSING_T1_CSV}"
-            continue
-        fi
-
-        note="${note};dlicv_mask_available"
+        note="${note};T1_N4_brain_ready"
 
         echo "  [${site}/${sub}] -> subLong=${subLong} (${note})"
         # Space-separated fields; changed to comma-separated in downstream flow
@@ -158,7 +146,7 @@ ARRAY_RANGE="0-$((n - 1))"
 echo "Submitting SLURM array job for ${ARRAY_RANGE}..."
 
 sbatch \
-    --export=PROJ_DIR="${PROJ_DIR}",PROTO_DIR="${PROTO_DIR}",REORIENT_DIR="${REORIENT_DIR}",DLICV_DIR="${DLICV_DIR}",LIST_DIR="${LIST_DIR}",SUBJECT_LIST="${SUBJECT_LIST}",PET_TAG="${PET_TAG}",FSLOUTPUTTYPE="NIFTI_GZ",LMOD_INIT="/cubic/software/centos7/lmod/lmod/init/bash",OSrelease="${OSrelease:-centos7}" \
+    --export=PROJ_DIR="${PROJ_DIR}",PROTO_DIR="${PROTO_DIR}",LIST_DIR="${LIST_DIR}",SUBJECT_LIST="${SUBJECT_LIST}",PET_TAG="${PET_TAG}",FSLOUTPUTTYPE="NIFTI_GZ",LMOD_INIT="/cubic/software/centos7/lmod/lmod/init/bash",OSrelease="${OSrelease:-centos7}" \
     --array="${ARRAY_RANGE}" "${SCRIPTS_DIR}/Step1_PET2T1.sh"
 
 echo "Submitted!"

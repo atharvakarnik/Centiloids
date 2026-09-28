@@ -4,12 +4,13 @@
 #     Adapted from GAAIN's vld to DPPOS Dataset     #
 # ------------------------------------------------- #
 #
-# Step0_PreprocessPET.sh
+# Step0_Preprocess.sh
 # SLURM array script: one subject per task.
 #
-# Supports both:
+# PET preprocessing supports both:
 #  - Static PET (3D)  -> copy only to ${SUB}_PET_3D.nii.gz
 #  - Dynamic PET (4D) -> mcflirt -> mean -> ${SUB}_PET_4D_mcf.nii.gz
+# T1 preprocessing creates shared DLICV-masked N4 outputs for Steps 1 and 2.
 #
 # Expected input layout in DPPOS-style B) :
 #   ${DATA_DIR}/${SITE}/${SUB}/${SUB}_${SITE}.nii.gz
@@ -17,6 +18,8 @@
 # Outputs:
 #   ${PROTO_DIR}/PET_Preproc/${SITE}/${SUB}/${SUB}_PET_3D.nii.gz      (3D, downstream canonical)
 #   ${PROTO_DIR}/PET_Preproc/${SITE}/${SUB}/${SUB}_PET_4D_mcf.nii.gz  (4D, only for dynamic)
+#   ${PROTO_DIR}/T1_Preproc/${SUBLONG}/${SUBLONG}_T1_N4.nii.gz
+#   ${PROTO_DIR}/T1_Preproc/${SUBLONG}/${SUBLONG}_T1_N4_brain.nii.gz
 #
 # Logs:
 #   ${LIST_DIR}/pet_preproc_selection.csv
@@ -55,11 +58,19 @@ export FSLOUTPUTTYPE='NIFTI_GZ'
 eval "$(${MCRMMBA_EXE} shell hook --shell bash)"
 micromamba activate HypoThal_QC
 
+# Load the production imaging tools after environment activation so they remain first on PATH.
+module use /cbica/share/modules
+module load fsl/5.0.11
+module load gcc/5.2.0
+module load ants/2.3.1
+
 ##############################
 # Environment sanity checks  #
 ##############################
 : "${PROJ_DIR:?PROJ_DIR is not set}"
 : "${DATA_DIR:?DATA_DIR is not set}"
+: "${REORIENT_DIR:?REORIENT_DIR is not set}"
+: "${DLICV_DIR:?DLICV_DIR is not set}"
 : "${LIST_DIR:?LIST_DIR is not set}"
 : "${PROTO_DIR:?PROTO_DIR is not set}"
 : "${SUBJECT_LIST:?SUBJECT_LIST is not set}"
@@ -70,9 +81,15 @@ OUT_ROOT="${PROTO_DIR}/PET_Preproc"
 mkdir -p "${LIST_DIR}" "${PROTO_DIR}" "${OUT_ROOT}"
 
 PET_FIXER="${PROJ_DIR}/Scripts/PET_reorient_validate.sh"
+T1_PREPROC_HELPER="${PROJ_DIR}/Scripts/T1_preprocess_N4.sh"
 
 if [[ ! -x "${PET_FIXER}" ]]; then
   echo "[ERROR] Missing or non-executable: ${PET_FIXER}" >&2
+  exit 1
+fi
+
+if [[ ! -f "${T1_PREPROC_HELPER}" ]]; then
+  echo "[ERROR] Missing T1 preprocessing helper: ${T1_PREPROC_HELPER}" >&2
   exit 1
 fi
 
@@ -100,8 +117,10 @@ if [ ! -f "${MISSING_CSV}" ]; then
   echo "SITE,SUBJECT,REASON" > "${MISSING_CSV}"
 fi
 
-echo "=== Step0: PET preprocessing (array task) ==="
+echo "=== Step0: PET and T1 preprocessing (array task) ==="
 echo "DATA_DIR : ${DATA_DIR}"
+echo "REORIENT_DIR: ${REORIENT_DIR}"
+echo "DLICV_DIR: ${DLICV_DIR}"
 echo "PET_TAG  : ${PET_TAG}"
 echo "OUT_ROOT : ${OUT_ROOT}"
 echo "LIST_DIR : ${LIST_DIR}"
@@ -208,7 +227,13 @@ pick_input_pet() {
 process_subject() {
     local site="$1"
     local sub="$2"
+    local subLong="$3"
     local sub_dir="${DATA_DIR}/${site}/${sub}"
+    local t1_raw="${REORIENT_DIR}/${subLong}/${subLong}_T1_LPS.nii.gz"
+    local dlicv_mask="${DLICV_DIR}/${subLong}/${subLong}_T1_LPS_dlicvmask.nii.gz"
+    local t1_preproc_dir="${PROTO_DIR}/T1_Preproc/${subLong}"
+    local t1_n4="${t1_preproc_dir}/${subLong}_T1_N4.nii.gz"
+    local t1_n4_brain="${t1_preproc_dir}/${subLong}_T1_N4_brain.nii.gz"
 
     if [ ! -d "${sub_dir}" ]; then
         echo "  [${site}/${sub}] Subject directory not found: ${sub_dir}"
@@ -216,7 +241,33 @@ process_subject() {
         return
     fi
 
-    echo "Processing SITE=${site}, SUB=${sub}..."
+    echo "Processing SITE=${site}, SUB=${sub}, SUBLONG=${subLong}..."
+
+    if [ ! -f "${t1_raw}" ]; then
+        echo "  -> Raw T1 missing: ${t1_raw}"
+        echo "${site},${sub},no_T1_file:${subLong}" >> "${MISSING_CSV}"
+        return
+    fi
+
+    if [ ! -f "${dlicv_mask}" ]; then
+        echo "  -> Required DLICV mask missing: ${dlicv_mask}"
+        echo "${site},${sub},no_DLICV_mask:${subLong}" >> "${MISSING_CSV}"
+        return
+    fi
+
+    if ! bash "${T1_PREPROC_HELPER}" "${t1_raw}" "${dlicv_mask}" "${PROTO_DIR}" "${subLong}"; then
+        echo "  -> Shared T1 preprocessing failed for ${subLong}."
+        echo "${site},${sub},T1_preprocess_failed:${subLong}" >> "${MISSING_CSV}"
+        return
+    fi
+
+    if [ ! -f "${t1_n4}" ] || [ ! -f "${t1_n4_brain}" ]; then
+        echo "  -> Shared T1 preprocessing outputs missing for ${subLong}."
+        echo "${site},${sub},T1_preprocess_outputs_missing:${subLong}" >> "${MISSING_CSV}"
+        return
+    fi
+
+    local t1_note="T1_N4_ready"
 
     local input_nii
     if ! input_nii="$(pick_input_pet "${site}" "${sub}")"; then
@@ -249,7 +300,7 @@ process_subject() {
     # Idempotency: if final 3D exists, we consider done
     if [ -f "${out_3d}" ]; then
         echo "  -> ${out_3d} exists; skipping."
-        echo "${site},${sub},${input_nii},${mode},${nvol},${out_3d},${out_4d},already_processed" >> "${SELECTION_CSV}"
+        echo "${site},${sub},${input_nii},${mode},${nvol},${out_3d},${out_4d},already_processed;${t1_note}" >> "${SELECTION_CSV}"
         return
     fi
 
@@ -269,7 +320,7 @@ process_subject() {
             return
         fi
 
-        echo "${site},${sub},${input_nii},${mode},${nvol},${out_3d},,OK_static_petfix" >> "${SELECTION_CSV}"
+        echo "${site},${sub},${input_nii},${mode},${nvol},${out_3d},,OK_static_petfix;${t1_note}" >> "${SELECTION_CSV}"
         echo "  -> Done."
         return
     fi
@@ -324,7 +375,7 @@ process_subject() {
     #     -o "${out_dir}/${sub}_4D_mcf_motion.png" || true
     # fi
 
-    echo "${site},${sub},${input_nii},${mode},${nvol},${out_3d},${out_4d},OK_mcflirt_Tmean" >> "${SELECTION_CSV}"
+    echo "${site},${sub},${input_nii},${mode},${nvol},${out_3d},${out_4d},OK_mcflirt_Tmean;${t1_note}" >> "${SELECTION_CSV}"
     echo "  -> Done."
 }
 
@@ -351,5 +402,11 @@ fi
 
 site="$(echo "${line}" | awk "{print \$1}")"
 sub="$(echo "${line}" | awk "{print \$2}")"
+subLong="$(echo "${line}" | awk "{print \$3}")"
 
-process_subject "${site}" "${sub}"
+if [ -z "${subLong}" ]; then
+  echo "ERROR: Missing SUBLONG for ${site}/${sub} in ${SUBJECT_LIST}" >&2
+  exit 1
+fi
+
+process_subject "${site}" "${sub}" "${subLong}"
