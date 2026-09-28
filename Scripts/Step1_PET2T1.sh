@@ -9,7 +9,7 @@
 # SLURM array script: one subject (site, sub, subLong) per task.
 #
 # Input:
-#   - PET Orig:  ${PROTO_DIR}/PET_Preproc/${site}/${sub}/${sub}_PET_5070.nii.gz
+#   - PET from Step 0: ${PROTO_DIR}/PET_Preproc/${site}/${sub}/${sub}_${PET_TAG}.nii.gz
 #   - T1 (LPS):  ${REORIENT_DIR}/${subLong}/${subLong}_T1_LPS.nii.gz
 #
 # Output (no site folder):
@@ -33,7 +33,6 @@ trap 'echo "ERROR: line ${LINENO}: ${BASH_COMMAND}" >&2' ERR
 : "${REORIENT_DIR:?REORIENT_DIR is not set}"
 : "${LIST_DIR:?LIST_DIR is not set}"
 : "${SUBJECT_LIST:?SUBJECT_LIST is not set}"
-: "${S0B_CSV:?S0B_CSV is not set}"
 : "${PET_TAG:?PET_TAG is not set}"
 
 # Make the batch shell deterministic. Not depending COMPLETELY on the submit shell's PATH.
@@ -168,33 +167,12 @@ subLong=$(echo "${line}" | awk '{print $3}')
 
 echo "Array task ${idx} -> SITE=${site}, SUB=${sub}, SUBLONG=${subLong}"
 
-# pet_mean="${PROTO_DIR}/PET_Preproc/${site}/${sub}/${sub}_4D_mcf_mean.nii.gz" # PATCHED - No MoCorr in GAAIN
 pet_og="${PROTO_DIR}/PET_Preproc/${site}/${sub}/${sub}_${PET_TAG}.nii.gz"
-pet_flip="${PROTO_DIR}/PET_OrientGate/${subLong}/${subLong}_${PET_TAG}_flipY.nii.gz"
-
-# Read flipY decision from Step0b output
-flipY=$(awk -F',' -v s="${site}" -v u="${sub}" -v sl="${subLong}" '
-  NR==1{next}
-  $1==s && $2==u && $3==sl {print $6; exit}
-' "${S0B_CSV}" 2>/dev/null || echo "")
-
-# Default to unflipped if missing/NA
 pet_in="${pet_og}"
-pet_note="flipY=0_or_missing"
-
-if [ "${flipY}" = "1" ]; then
-  if [ -f "${pet_flip}" ]; then
-    pet_in="${pet_flip}"
-    pet_note="flipY=1_used_flipfile"
-  else
-    # fall back if flip file missing
-    pet_note="flipY=1_but_flipfile_missing_used_orig"
-  fi
-fi
 t1="${REORIENT_DIR}/${subLong}/${subLong}_T1_LPS.nii.gz"
 
-if [ ! -f "${pet_og}" ]; then
-    echo "  [${site}/${sub}/${subLong}] mean PET not found: ${pet_og}"
+if [ ! -f "${pet_in}" ]; then
+    echo "  [${site}/${sub}/${subLong}] Step 0 PET not found: ${pet_in}"
     echo "${site},${sub},${subLong},no_pet_og" >> "${MISSING_CSV}"
     exit 0
 fi
@@ -264,7 +242,7 @@ mv -f "${prefix}Warped.nii.gz" "${out_pet_rT1}"
 rm -f "${prefix}"0GenericAffine.mat 2>/dev/null || true
 rm -f "${prefix}"InverseWarped.nii.gz 2>/dev/null || true
 
-echo "${site},${sub},${subLong},${pet_og},${t1},OK;${pet_note}" >> "${SELECTION_CSV}"
+echo "${site},${sub},${subLong},${pet_in},${t1},OK" >> "${SELECTION_CSV}"
 echo "  -> Registration complete."
 
 echo

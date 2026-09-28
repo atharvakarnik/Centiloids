@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Step0b_wrapper_PET_OrientFlipGate.sh
+# DEPR_Step0b_wrapper_PET_OrientFlipGate.sh
 set -euo pipefail
 
 # IMPORTANT : Check this var meticulously to state correct cohort!!! 
@@ -53,6 +53,6 @@ ARRAY_RANGE="0-$((n - 1))"
 
 sbatch \
   --export=PROJ_DIR="${PROJ_DIR}",PROTO_DIR="${PROTO_DIR}",LIST_DIR="${LIST_DIR}",REORIENT_DIR="${REORIENT_DIR}",SUBJECT_LIST="${SUBJECT_LIST}",OUT_CSV="${OUT_CSV}",MISSING_CSV="${MISSING_CSV}",PET_TAG="${PET_TAG}",FSLOUTPUTTYPE='NIFTI_GZ',HOME="${HOME}",FSLDIR="${FSLDIR}" \
-  --array="${ARRAY_RANGE}" "${SCRIPTS_DIR}/Step0b_PET_OrientFlipGate.sh"
+  --array="${ARRAY_RANGE}" "${SCRIPTS_DIR}/DEPR_Step0b_PET_OrientFlipGate.sh"
 
 echo "Submitted Step0b array."

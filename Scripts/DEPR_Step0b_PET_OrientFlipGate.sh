@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Step0b_PET_OrientFlipGate.sh
+# DEPR_Step0b_PET_OrientFlipGate.sh
 #SBATCH --job-name=PET_OrientGate
 #SBATCH --partition=all
 #SBATCH --propagate=NONE

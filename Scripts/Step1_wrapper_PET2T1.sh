@@ -26,9 +26,6 @@ SCRIPTS_DIR="${PROJ_DIR}/Scripts"
 
 mkdir -p "${LIST_DIR}" "${PROTO_DIR}"
 
-# Step 0b Reorient Flags
-S0B_CSV="${LIST_DIR}/s0b_orient_flip_flags.csv"
-
 # Stage-1 list files (CSV with s1_ prefix)
 SUBJECT_LIST="${LIST_DIR}/s1_pet2t1_subjects.csv"
 MISSING_T1_CSV="${LIST_DIR}/s1_pet2t1_missing_T1.csv"
@@ -138,7 +135,7 @@ ARRAY_RANGE="0-$((n - 1))"
 echo "Submitting SLURM array job for ${ARRAY_RANGE}..."
 
 sbatch \
-    --export=PROJ_DIR="${PROJ_DIR}",PROTO_DIR="${PROTO_DIR}",REORIENT_DIR="${REORIENT_DIR}",LIST_DIR="${LIST_DIR}",SUBJECT_LIST="${SUBJECT_LIST}",,S0B_CSV="${S0B_CSV}",PET_TAG="${PET_TAG}",FSLOUTPUTTYPE="NIFTI_GZ",LMOD_INIT="/cubic/software/centos7/lmod/lmod/init/bash",OSrelease="${OSrelease:-centos7}" \
+    --export=PROJ_DIR="${PROJ_DIR}",PROTO_DIR="${PROTO_DIR}",REORIENT_DIR="${REORIENT_DIR}",LIST_DIR="${LIST_DIR}",SUBJECT_LIST="${SUBJECT_LIST}",PET_TAG="${PET_TAG}",FSLOUTPUTTYPE="NIFTI_GZ",LMOD_INIT="/cubic/software/centos7/lmod/lmod/init/bash",OSrelease="${OSrelease:-centos7}" \
     --array="${ARRAY_RANGE}" "${SCRIPTS_DIR}/Step1_PET2T1.sh"
 
 echo "Submitted!"
