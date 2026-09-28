@@ -20,7 +20,7 @@
 #   bash Step1_wrapper_PET2T1.sh
 #
 #SBATCH --job-name=PET2T1
-#SBATCH --output=Logs/Jun26/PET2T1_%A_%a.log
+#SBATCH --output=Logs/Aug26/PET2T1_%A_%a.log
 #SBATCH --time=3:00:00
 #SBATCH --cpus-per-task=4
 #SBATCH --mem=16G
@@ -98,8 +98,11 @@ echo "ulimit -St after : $(ulimit -St)"
 echo "ulimit -Ht after : $(ulimit -Ht)"
 # ---------------------------------------------------
 
-# ------- Pin ANTs and its GCC runtime on every compute node -------
+# ------- Pin ANTs and its proven GCC runtime on every compute node -------
 ANTS_ROOT="${ANTS_ROOT:-/cbica/software/external/ants/centos7/2.3.1}"
+ANTS_MODULE_LIB="${ANTS_MODULE_LIB:-/cbica/software/external/ANTs/centos7/2.3.1/lib}"
+GCC_ROOT="${GCC_ROOT:-/cbica/software/external/gcc/centos7/5.2.0}"
+GCC_LIBSTDCPP="${GCC_LIBSTDCPP:-${GCC_ROOT}/lib64/libstdc++.so.6}"
 ANTS_REGISTRATION="${ANTS_ROOT}/bin/antsRegistration"
 ANTS_APPLY_TRANSFORMS="${ANTS_ROOT}/bin/antsApplyTransforms"
 
@@ -112,24 +115,18 @@ done
 
 export ANTSPATH="${ANTS_ROOT}/bin/"
 prepend_path PATH "${ANTS_ROOT}/bin"
-prepend_path LD_LIBRARY_PATH "${ANTS_ROOT}/lib"
-prepend_path LD_LIBRARY_PATH "${ANTS_ROOT}/ITKv5-install/lib"
 
-# Resolve libstdc++ from the explicitly loaded GCC module. Prepending this
-# directory prevents a compute node's older /lib64 copy from winning.
-GCC_EXE="$(command -v gcc || true)"
-if [[ -z "${GCC_EXE}" ]]; then
-    echo "ERROR: gcc is unavailable after loading ${GCC_MODULE}" >&2
-    exit 127
-fi
+# Put the library ordering observed in a successful Step-2 compute-node log
+# first. Keep the module-generated tail because Step 1 additionally uses FSL.
+# The gcc/5.2.0 module exposes these runtime libraries but no `gcc` executable.
+module_library_path="${LD_LIBRARY_PATH:-}"
+proven_ants_library_path="${ANTS_ROOT}/ITKv5-install/lib:${ANTS_ROOT}/lib:${ANTS_MODULE_LIB}:${GCC_ROOT}/lib64:${GCC_ROOT}/lib"
+export LD_LIBRARY_PATH="${proven_ants_library_path}${module_library_path:+:${module_library_path}}"
 
-GCC_LIBSTDCPP="${GCC_LIBSTDCPP:-$("${GCC_EXE}" -print-file-name=libstdc++.so.6 2>/dev/null || true)}"
-if [[ "${GCC_LIBSTDCPP}" != /* || ! -r "${GCC_LIBSTDCPP}" ]]; then
-    echo "ERROR: ${GCC_MODULE} did not resolve a readable libstdc++.so.6: ${GCC_LIBSTDCPP:-not_found}" >&2
+if [[ ! -r "${GCC_LIBSTDCPP}" ]]; then
+    echo "ERROR: Proven GCC runtime is not readable: ${GCC_LIBSTDCPP}" >&2
     exit 126
 fi
-GCC_LIB_DIR="$(dirname "${GCC_LIBSTDCPP}")"
-prepend_path LD_LIBRARY_PATH "${GCC_LIB_DIR}"
 hash -r
 
 echo "MODULE_ROOT        : ${MODULE_ROOT}"
@@ -139,8 +136,7 @@ echo "ANTS_MODULE        : ${ANTS_MODULE}"
 echo "ANTS_REGISTRATION  : ${ANTS_REGISTRATION}"
 echo "ANTS_APPLY_XFORMS  : ${ANTS_APPLY_TRANSFORMS}"
 echo "ANTSPATH           : ${ANTSPATH}"
-echo "GCC_EXE            : ${GCC_EXE}"
-echo "GCC libstdc++      : ${GCC_LIBSTDCPP}"
+echo "Expected libstdc++ : ${GCC_LIBSTDCPP}"
 echo "LD_LIBRARY_PATH    : ${LD_LIBRARY_PATH}"
 
 if command -v ldd >/dev/null 2>&1 && command -v grep >/dev/null 2>&1; then
@@ -160,6 +156,12 @@ if command -v ldd >/dev/null 2>&1 && command -v grep >/dev/null 2>&1; then
 
     if [[ "${libstdcpp}" == /lib64/* ]]; then
         echo "ERROR: ANTs is using old system libstdc++: ${libstdcpp}" >&2
+        exit 126
+    fi
+
+    if [[ "${libstdcpp}" != "${GCC_LIBSTDCPP}" ]]; then
+        echo "ERROR: ANTs resolved an unexpected libstdc++: ${libstdcpp}" >&2
+        echo "Expected: ${GCC_LIBSTDCPP}" >&2
         exit 126
     fi
 

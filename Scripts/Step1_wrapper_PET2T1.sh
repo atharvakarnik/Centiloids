@@ -18,20 +18,23 @@ PET_TAG="PET_3D"
 
 PROJ_DIR="${HOME}/Pipelines/Centiloids"
 
-LIST_DIR="${PROJ_DIR}/Lists/Jun26"
-PROTO_DIR="${PROJ_DIR}/Protocols/Jun26"
+LIST_DIR="${PROJ_DIR}/Lists/Aug26"
+PROTO_DIR="${PROJ_DIR}/Protocols/Aug26"
 PREPROC_PET_ROOT="${PROTO_DIR}/PET_Preproc"
 REORIENT_DIR="${PROJ_DIR}/Data/ReOrientedLPS"
 T1_PREPROC_ROOT="${PROTO_DIR}/T1_Preproc"
 SCRIPTS_DIR="${PROJ_DIR}/Scripts"
 
-# Keep the cluster toolchain explicit when the job is launched. The worker
-# resolves the loaded GCC module's libstdc++.so.6 path on each compute node.
+# Keep the cluster toolchain explicit when the job is launched. These runtime
+# paths are taken from a successful Step-2 compute-node log.
 MODULE_ROOT="/cbica/share/modules"
 FSL_MODULE="fsl/5.0.11"
 GCC_MODULE="gcc/5.2.0"
 ANTS_MODULE="ants/2.3.1"
 ANTS_ROOT="/cbica/software/external/ants/centos7/2.3.1"
+ANTS_MODULE_LIB="/cbica/software/external/ANTs/centos7/2.3.1/lib"
+GCC_ROOT="/cbica/software/external/gcc/centos7/5.2.0"
+GCC_LIBSTDCPP="${GCC_ROOT}/lib64/libstdc++.so.6"
 
 mkdir -p "${LIST_DIR}" "${PROTO_DIR}"
 
@@ -48,6 +51,7 @@ echo "T1_PREPROC_ROOT: ${T1_PREPROC_ROOT}"
 echo "LIST_DIR       : ${LIST_DIR}"
 echo "SUBJECT_LIST   : ${SUBJECT_LIST}"
 echo "ANTS_ROOT      : ${ANTS_ROOT}"
+echo "GCC_LIBSTDCPP  : ${GCC_LIBSTDCPP}"
 echo "==============================================="
 echo
 
@@ -155,7 +159,7 @@ ARRAY_RANGE="0-$((n - 1))"
 echo "Submitting SLURM array job for ${ARRAY_RANGE}..."
 
 sbatch \
-    --export=PROJ_DIR="${PROJ_DIR}",PROTO_DIR="${PROTO_DIR}",LIST_DIR="${LIST_DIR}",SUBJECT_LIST="${SUBJECT_LIST}",PET_TAG="${PET_TAG}",FSLOUTPUTTYPE="NIFTI_GZ",LMOD_INIT="/cubic/software/centos7/lmod/lmod/init/bash",OSrelease="${OSrelease:-centos7}",MODULE_ROOT="${MODULE_ROOT}",FSL_MODULE="${FSL_MODULE}",GCC_MODULE="${GCC_MODULE}",ANTS_MODULE="${ANTS_MODULE}",ANTS_ROOT="${ANTS_ROOT}" \
+    --export=PROJ_DIR="${PROJ_DIR}",PROTO_DIR="${PROTO_DIR}",LIST_DIR="${LIST_DIR}",SUBJECT_LIST="${SUBJECT_LIST}",PET_TAG="${PET_TAG}",FSLOUTPUTTYPE="NIFTI_GZ",LMOD_INIT="/cubic/software/centos7/lmod/lmod/init/bash",OSrelease="${OSrelease:-centos7}",MODULE_ROOT="${MODULE_ROOT}",FSL_MODULE="${FSL_MODULE}",GCC_MODULE="${GCC_MODULE}",ANTS_MODULE="${ANTS_MODULE}",ANTS_ROOT="${ANTS_ROOT}",ANTS_MODULE_LIB="${ANTS_MODULE_LIB}",GCC_ROOT="${GCC_ROOT}",GCC_LIBSTDCPP="${GCC_LIBSTDCPP}" \
     --array="${ARRAY_RANGE}" "${SCRIPTS_DIR}/Step1_PET2T1.sh"
 
 echo "Submitted!"
